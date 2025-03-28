@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -11,7 +11,6 @@ from typing import Union, Optional
 import os
 from datetime import datetime
 import asyncio
-from pydantic import BaseModel
 
 
 driver_lock = asyncio.Lock()
@@ -42,10 +41,6 @@ if os.path.exists(lock_path):
 driver = webdriver.Chrome(options=options)
 driver.set_page_load_timeout(30)
 wait = WebDriverWait(driver, 20)
-
-class RequisicaoHorario(BaseModel):
-    especialidade: str
-    data: Optional[str] = None
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
@@ -90,6 +85,8 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
 
     return horarios
 
+# def buscar_primeiro_horario(especialidade: str) -> Union[str, None]:
+# def buscar_primeiro_horario(especialidade: str, data: Optional[str] = None) -> Union[str, None]:
 async def buscar_primeiro_horario(especialidade: str, data: Optional[str] = None) -> Union[str, None]:
     async with driver_lock:
         import time
@@ -215,29 +212,32 @@ async def buscar_primeiro_horario(especialidade: str, data: Optional[str] = None
             traceback.print_exc()
             return f"Erro ao buscar horário: {type(e).__name__}: {str(e)}"
 
-@app.post("/n8n/horario")
-async def n8n_horario(body: RequisicaoHorario):
-    resultado = await buscar_primeiro_horario(body.especialidade, body.data)
+@app.get("/horario")
+# def get_horario(especialidade: str = Query(..., description="Nome da especialidade")):
+# def get_horario(
+#     especialidade: str = Query(..., description="Nome da especialidade"),
+#     data: Optional[str] = Query(None, description="Data no formato dd/mm/yyyy (opcional)")
+# ):
+@app.get("/horario")
+async def get_horario(
+    especialidade: str = Query(..., description="Nome da especialidade"),
+    data: Optional[str] = Query(None, description="Data no formato dd/mm/yyyy (opcional)")
+):
+    print(f"\n\n📥 Requisição recebida: especialidade = {especialidade}, data = {data}")
+    resultado = await buscar_primeiro_horario(especialidade, data)
 
     if isinstance(resultado, str) and resultado.lower().startswith("erro"):
+        print(f"📤 Retorno: {{'erro': '{resultado}'}}")
+        return {"erro": resultado}
+
+    elif resultado is None:
+        print(f"📤 Retorno: {{'mensagem': 'Nenhum horário encontrado para {especialidade}'}}")
+        return {"mensagem": f"Nenhum horário encontrado para {especialidade}"}
+
+    else:
+        print(f"📤 Retorno: {{'especialidade': '{especialidade}', 'primeiro_horario': '{resultado}'}}")
         return {
-            "status": "erro",
-            "mensagem": resultado,
-            "especialidade": body.especialidade,
-            "data": body.data
+            "especialidade": especialidade,
+            "primeiro_horario": resultado
         }
 
-    if resultado is None:
-        return {
-            "status": "nenhum",
-            "mensagem": f"Nenhum horário encontrado para {body.especialidade}.",
-            "especialidade": body.especialidade,
-            "data": body.data
-        }
-
-    return {
-        "status": "ok",
-        "especialidade": body.especialidade,
-        "data": body.data,
-        "primeiro_horario": resultado
-    }
