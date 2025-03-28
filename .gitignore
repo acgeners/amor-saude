@@ -1,8 +1,8 @@
 .env.secreto
+.env
 __pycache__/
 chrome_profile/
 chrome_profile_api/
-run.sh~  # backups do shell
 
 .DS_Store
 app_22_03.py
