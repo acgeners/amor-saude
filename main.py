@@ -1,25 +1,37 @@
+import json
 from fastapi import FastAPI
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-# from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import TimeoutException
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from typing import Union, Optional
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 from pydantic import BaseModel
-
+from zoneinfo import ZoneInfo
+import time
+import traceback
+import redis
 
 driver_lock = asyncio.Lock()
+historico_horarios = {}  # (solicitante_id, especialidade, data) -> [horários já retornados]
 load_dotenv()
 
 USUARIO = os.getenv("USUARIO")
 SENHA = os.getenv("SENHA")
 CHROME_PROFILE = os.getenv("CHROME_PROFILE_DIR", "./chrome_profile_api")
+REDIS_URL = os.getenv("REDIS_URL")
+redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+
+abreviacoes_meses = {
+    1: "JAN", 2: "FEV", 3: "MAR", 4: "ABR", 5: "MAI", 6: "JUN",
+    7: "JUL", 8: "AGO", 9: "SET", 10: "OUT", 11: "NOV", 12: "DEZ"
+}
 
 # 🧠 Inicializa o navegador com perfil persistente
 options = Options()
@@ -44,8 +56,34 @@ driver.set_page_load_timeout(30)
 wait = WebDriverWait(driver, 20)
 
 class RequisicaoHorario(BaseModel):
+    solicitante_id: str  # novo campo obrigatório
     especialidade: str
     data: Optional[str] = None
+    minutos_ate_disponivel: Optional[int] = 0
+
+def marcar_horario_como_enviado(solicitante_id, especialidade, data, horario):
+    chave = f"{solicitante_id}:{especialidade.lower()}:{data}"
+    historico: Optional[str] = redis_client.get(chave)
+    lista = json.loads(historico) if historico else []
+
+    if horario not in lista:
+        lista.append(horario)
+
+        # ⏳ Calcula quantos segundos faltam até o final do dia
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
+        fim_do_dia = datetime.combine(hoje.date(), datetime.max.time()).replace(tzinfo=hoje.tzinfo)
+        segundos_ate_fim_do_dia = int((fim_do_dia - hoje).total_seconds())
+
+        redis_client.setex(chave, segundos_ate_fim_do_dia, json.dumps(lista))
+
+
+
+def ja_foi_enviado(solicitante_id, especialidade, data, horario):
+    chave = f"{solicitante_id}:{especialidade.lower()}:{data}"
+    historico: Optional[str] = redis_client.get(chave)
+    if not historico:
+        return False
+    return horario in json.loads(historico)
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
@@ -90,14 +128,68 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
 
     return horarios
 
-async def buscar_primeiro_horario(especialidade: str, data: Optional[str] = None) -> Union[str, None]:
+
+async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data: Optional[str] = None,
+                                  minutos_ate_disponivel: int = 0) -> Union[str, None]:
     async with driver_lock:
-        import time
-        import traceback
         print("🧭 Acessando AmorSaúde...")
+
+        def navegar_para_data(target_date: datetime) -> bool:
+            try:
+                wait.until(EC.presence_of_element_located((By.ID, "tblCalendario")))
+
+                for _ in range(12):  # tenta no máximo 12 meses à frente
+                    # Lê o mês atual exibido no calendário
+                    try:
+                        ths = driver.find_elements(By.CSS_SELECTOR, "#tblCalendario th")
+                        mes_atual_th = next((th for th in ths if " - " in th.text), None)
+                        if not mes_atual_th:
+                            print("⚠️ Não foi possível identificar o mês atual do calendário.")
+                            return False
+
+                        mes_atual_texto = mes_atual_th.text.strip().upper()  # ex: 'MAR - 2025'
+                        mes_desejado_texto = f"{abreviacoes_meses[target_date.month]} - {target_date.year}"
+
+                        if mes_atual_texto == mes_desejado_texto:
+                            id_data = target_date.strftime("%d/%m/%Y")
+                            # Agora tenta clicar na célula da data desejada
+                            try:
+                                data_element = wait.until(EC.element_to_be_clickable((By.ID, id_data)))
+                                driver.execute_script("arguments[0].scrollIntoView(true);", data_element)
+                                data_element.click()
+                                time.sleep(1.5)
+                                return True
+                            except Exception as e:
+                                print(f"⚠️ Falha ao clicar na data {id_data}: {e}")
+                                return False
+                        else:
+                            # Mês ainda não é o certo: avança
+                            botoes_direita = driver.find_elements(By.CSS_SELECTOR,
+                                                                  "table#tblCalendario th.hand.text-right")
+                            for botao in botoes_direita:
+                                if botao.get_attribute("onclick") and "changeMonth" in botao.get_attribute("onclick"):
+                                    driver.execute_script("arguments[0].click();", botao)
+                                    time.sleep(1.5)
+                                    break
+                            else:
+                                print("⚠️ Botão de próximo mês não encontrado.")
+                                return False
+
+                    except Exception as e:
+                        print(f"⚠️ Erro ao comparar/avançar mês: {e}")
+                        return False
+
+            except Exception as e:
+                print(f"⚠️ Erro geral ao navegar até a data {target_date.strftime('%d/%m/%Y')}: {e}")
+            return False
 
         try:
             # ⚙️ Limpa ambiente entre chamadas
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            limite = agora + timedelta(minutes=minutos_ate_disponivel)
+            data_base = datetime.strptime(data, "%d/%m/%Y") if data else agora
+            print(f"🕒 Agora: {agora.strftime('%d/%m/%Y %H:%M')} — ⏳ Limite: {limite.strftime('%d/%m/%Y %H:%M')}")
+
             try:
                 driver.delete_all_cookies()
             except Exception as e:
@@ -132,12 +224,12 @@ async def buscar_primeiro_horario(especialidade: str, data: Optional[str] = None
             # Verifica se a checkbox está visível; se não estiver, tenta recarregar a página
             try:
                 checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
-            except Exception:
+            except TimeoutException:
                 print("⚠️ Checkbox 'HVazios' não encontrada na primeira tentativa. Recarregando página...")
                 driver.refresh()
                 try:
                     checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
-                except Exception:
+                except TimeoutException:
                     print("❌ Checkbox ainda não apareceu. Abortando.")
                     return f"Erro ao buscar horário: filtro de horários vazios não está visível na página."
 
@@ -161,63 +253,70 @@ async def buscar_primeiro_horario(especialidade: str, data: Optional[str] = None
                 }
             """)
 
-            # Se data não for fornecida, usa a data atual
-            if not data:
-                data = datetime.now().strftime("%d/%m/%Y")
-                print(f"📅 Nenhuma data fornecida — usando data de hoje: {data}")
-            else:
-                try:
-                    datetime.strptime(data, "%d/%m/%Y")
-                except ValueError:
-                    return f"Erro: formato de data inválido. Use dd/mm/yyyy."
-            try:
-                # Valida formato
-                datetime.strptime(data, "%d/%m/%Y")
-                print(f"📅 Buscando a data {data} no calendário...")
-                wait.until(EC.presence_of_element_located((By.ID, "tblCalendario")))
-                data_element = wait.until(EC.element_to_be_clickable((By.ID, data)))
-                driver.execute_script("arguments[0].scrollIntoView(true);", data_element)
-                data_element.click()
-                time.sleep(2)
-                print(f"✅ Clique na data {data} realizado com sucesso.")
-            except ValueError:
-                return f"Erro: formato de data inválido. Use dd/mm/yyyy."
-            except Exception as e:
-                print(f"⚠️ Erro ao tentar clicar na data {data}: {e}")
-                return f"Erro ao clicar na data {data}: {type(e).__name__}: {str(e)}"
+            for dias_adiante in range(0, 30):  # tenta pelos próximos 30 dias
+                data_atual = data_base + timedelta(days=dias_adiante)
+                data_str = data_atual.strftime("%d/%m/%Y")
+                print(f"📆 Tentando data {data_str}...")
 
-            blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
-            todos_horarios = []
+                sucesso = navegar_para_data(data_atual)
+                if not sucesso:
+                    print(f"❌ Não foi possível acessar a data {data_str}")
+                    continue
 
-            for bloco in blocos:
-                horarios = extrair_horarios_de_bloco(bloco, especialidade)
-                todos_horarios.extend(horarios)
+                blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
+                todos_horarios = []
 
-            if todos_horarios:
-                def converter_para_minutos(hora_str):
+                for bloco in blocos:
+                    horarios = extrair_horarios_de_bloco(bloco, especialidade)
+                    todos_horarios.extend(horarios)
+
+                if not todos_horarios:
+                    print(f"⚠️ Nenhum horário na data {data_str}, tentando próxima...")
+                    continue
+
+                def converter_para_datetime(hora_str):
                     try:
-                        h, m = map(int, hora_str.split(":"))
-                        return h * 60 + m
+                        hora_dt = datetime.strptime(hora_str, "%H:%M")
+                        dt_local = datetime.combine(data_atual.date(), hora_dt.time())
+                        return dt_local.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
                     except ValueError:
-                        return float('inf')
+                        return None
 
-                todos_horarios.sort(key=converter_para_minutos)
-                primeiro = todos_horarios[0]
-                print(f"⏰ Primeiro horário encontrado: {primeiro}")
-                return primeiro
+                horarios_validos = [
+                    h for h in todos_horarios
+                    if (dt := converter_para_datetime(h)) and dt >= limite
+                ]
 
-            else:
-                print(f"❌ Nenhum horário encontrado para {especialidade}")
-                return None
+                if not horarios_validos:
+                    continue
+
+                proximos_horarios = [
+                    h for h in horarios_validos
+                    if not ja_foi_enviado(solicitante_id, especialidade, data_str, h)
+                ]
+
+                if not proximos_horarios:
+                    continue
+
+                proximo_horario = proximos_horarios[0]
+                marcar_horario_como_enviado(solicitante_id, especialidade, data_str, proximo_horario)
+
+                return proximo_horario
+
+            return None  # nenhum horário encontrado após 30 dias
 
         except Exception as e:
-            print("❌ Erro durante a busca:")
             traceback.print_exc()
             return f"Erro ao buscar horário: {type(e).__name__}: {str(e)}"
 
 @app.post("/n8n/horario")
 async def n8n_horario(body: RequisicaoHorario):
-    resultado = await buscar_primeiro_horario(body.especialidade, body.data)
+    resultado = await buscar_primeiro_horario(
+        body.especialidade,
+        body.solicitante_id,  # ✅ adiciona isso aqui
+        body.data,
+        body.minutos_ate_disponivel or 0
+    )
 
     if isinstance(resultado, str) and resultado.lower().startswith("erro"):
         return {

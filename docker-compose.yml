@@ -9,7 +9,7 @@ services:
     volumes:
       - ./chrome_profile_api:/app/chrome_profile_api
     env_file:
-      - .env.secreto
+      - .env
     shm_size: '1gb'
     restart: unless-stopped
 

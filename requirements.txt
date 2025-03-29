@@ -2,8 +2,8 @@ fastapi~=0.115.12
 selenium~=4.30.0
 python-dotenv~=1.0.1
 uvicorn[standard]
+redis
 
 
 requests~=2.32.3
-beautifulsoup4~=4.13.3
 pydantic~=2.10.6
