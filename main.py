@@ -69,13 +69,8 @@ def marcar_horario_como_enviado(solicitante_id, especialidade, data, horario):
     if horario not in lista:
         lista.append(horario)
 
-        # ⏳ Calcula quantos segundos faltam até o final do dia
-        hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
-        fim_do_dia = datetime.combine(hoje.date(), datetime.max.time()).replace(tzinfo=hoje.tzinfo)
-        segundos_ate_fim_do_dia = int((fim_do_dia - hoje).total_seconds())
-
-        redis_client.setex(chave, segundos_ate_fim_do_dia, json.dumps(lista))
-
+        # ⏱ Define o tempo de expiração como 24 horas (em segundos)
+        redis_client.setex(chave, 86400, json.dumps(lista))  # 86400s = 24h
 
 
 def ja_foi_enviado(solicitante_id, especialidade, data, horario):
@@ -159,8 +154,8 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                                 data_element.click()
                                 time.sleep(1.5)
                                 return True
-                            except Exception as e:
-                                print(f"⚠️ Falha ao clicar na data {id_data}: {e}")
+                            except Exception as e_data:
+                                print(f"⚠️ Falha ao clicar na data {id_data}: {e_data}")
                                 return False
                         else:
                             # Mês ainda não é o certo: avança
@@ -175,12 +170,12 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                                 print("⚠️ Botão de próximo mês não encontrado.")
                                 return False
 
-                    except Exception as e:
-                        print(f"⚠️ Erro ao comparar/avançar mês: {e}")
+                    except Exception as e_mes:
+                        print(f"⚠️ Erro ao comparar/avançar mês: {e_mes}")
                         return False
 
-            except Exception as e:
-                print(f"⚠️ Erro geral ao navegar até a data {target_date.strftime('%d/%m/%Y')}: {e}")
+            except Exception as e_data2:
+                print(f"⚠️ Erro geral ao navegar até a data {target_date.strftime('%d/%m/%Y')}: {e_data2}")
             return False
 
         try:
