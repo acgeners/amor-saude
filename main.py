@@ -301,8 +301,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                 proximo_horario = proximos_horarios[0]
                 marcar_horario_como_enviado(solicitante_id, especialidade, data_str, proximo_horario)
 
-                dt_formatado = f"{data_str} {proximo_horario}"
-                return dt_formatado
+                return proximo_horario
 
             return None  # nenhum horário encontrado após 30 dias
 
