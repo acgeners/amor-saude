@@ -130,7 +130,7 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
 
 
 async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data: Optional[str] = None,
-                                  minutos_ate_disponivel: int = 0) -> Union[str, None]:
+                                  minutos_ate_disponivel: int = 0) -> Union[dict[str, str], None]:
     async with driver_lock:
         print("🧭 Acessando AmorSaúde...")
 
@@ -231,7 +231,9 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                     checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
                 except TimeoutException:
                     print("❌ Checkbox ainda não apareceu. Abortando.")
-                    return f"Erro ao buscar horário: filtro de horários vazios não está visível na página."
+                    return {
+                        "erro": f"{type(e).__name__}: {str(e)}"
+                    }
 
             # Força recarregamento do JS marcando e desmarcando
             driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
@@ -301,13 +303,19 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                 proximo_horario = proximos_horarios[0]
                 marcar_horario_como_enviado(solicitante_id, especialidade, data_str, proximo_horario)
 
-                return proximo_horario
+                return {
+                    "data": data_str,
+                    "proximo_horario": proximo_horario
+                }
 
             return None  # nenhum horário encontrado após 30 dias
 
         except Exception as e:
             traceback.print_exc()
-            return f"Erro ao buscar horário: {type(e).__name__}: {str(e)}"
+            return {
+                "erro": f"{type(e).__name__}: {str(e)}"
+            }
+
 
 @app.post("/n8n/horario")
 async def n8n_horario(body: RequisicaoHorario):
@@ -337,6 +345,6 @@ async def n8n_horario(body: RequisicaoHorario):
     return {
         "status": "ok",
         "especialidade": body.especialidade,
-        "data": body.data,
-        "primeiro_horario": resultado
+        "data": resultado["data"],
+        "proximo_horario": resultado["proximo_horario"]
     }
