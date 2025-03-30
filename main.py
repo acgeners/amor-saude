@@ -61,6 +61,17 @@ class RequisicaoHorario(BaseModel):
     data: Optional[str] = None
     minutos_ate_disponivel: Optional[int] = 0
 
+# def marcar_horario_como_enviado(solicitante_id, especialidade, data, horario):
+#     chave = f"{solicitante_id}:{especialidade.lower()}:{data}"
+#     historico: Optional[str] = redis_client.get(chave)
+#     lista = json.loads(historico) if historico else []
+#
+#     if horario not in lista:
+#         lista.append(horario)
+#
+#         # ⏱ Define o tempo de expiração como 24 horas (em segundos)
+#         redis_client.setex(chave, 86400, json.dumps(lista))  # 86400s = 24h
+
 def marcar_horario_como_enviado(solicitante_id, especialidade, data, horario):
     chave = f"{solicitante_id}:{especialidade.lower()}:{data}"
     historico: Optional[str] = redis_client.get(chave)
@@ -69,8 +80,12 @@ def marcar_horario_como_enviado(solicitante_id, especialidade, data, horario):
     if horario not in lista:
         lista.append(horario)
 
-        # ⏱ Define o tempo de expiração como 24 horas (em segundos)
-        redis_client.setex(chave, 86400, json.dumps(lista))  # 86400s = 24h
+        # ⏳ Calcula quantos segundos faltam até o fim do dia (23:59:59)
+        agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+        fim_do_dia = datetime(agora.year, agora.month, agora.day, 23, 59, 59, tzinfo=ZoneInfo("America/Sao_Paulo"))
+        segundos_ate_fim_do_dia = int((fim_do_dia - agora).total_seconds())
+
+        redis_client.setex(chave, segundos_ate_fim_do_dia, json.dumps(lista))
 
 
 def ja_foi_enviado(solicitante_id, especialidade, data, horario):
