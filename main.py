@@ -114,10 +114,13 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
             # botoes = bloco.find_elements(By.CSS_SELECTOR, "button.btn-info")
             botoes = bloco.find_elements(By.CSS_SELECTOR, ".btn-info")
             for botao in botoes:
-                texto = botao.text.strip()
-                if texto:
-                    print(texto)
-                    horarios.append(texto)
+                try:
+                    texto = botao.text.strip()
+                    if texto:
+                        print(texto)
+                        horarios.append(texto)
+                except Exception as e:
+                    print(f"⚠️ Botão obsoleto ignorado: {e}")
 
     except Exception as e:
         print(f"⚠️ Erro ao processar bloco: {e}")
@@ -365,6 +368,6 @@ async def n8n_horario(body: RequisicaoHorario):
     return {
         "status": "ok",
         "especialidade": body.especialidade,
-        "data": resultado["data"],
+        "data": resultado.get("data"),
         "proximo_horario": resultado["proximo_horario"]
     }
