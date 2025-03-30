@@ -16,7 +16,8 @@ from pydantic import BaseModel
 from zoneinfo import ZoneInfo
 import time
 import traceback
-import redis
+# import redis
+from redis import from_url
 
 driver_lock = asyncio.Lock()
 historico_horarios = {}  # (solicitante_id, especialidade, data) -> [horários já retornados]
@@ -26,7 +27,7 @@ USUARIO = os.getenv("USUARIO")
 SENHA = os.getenv("SENHA")
 CHROME_PROFILE = os.getenv("CHROME_PROFILE_DIR", "./chrome_profile_api")
 REDIS_URL = os.getenv("REDIS_URL")
-redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+redis_client = from_url(REDIS_URL, decode_responses=True)
 
 abreviacoes_meses = {
 1: "JAN", 2: "FEV", 3: "MAR", 4: "ABR", 5: "MAI", 6: "JUN",
@@ -56,10 +57,17 @@ driver.set_page_load_timeout(30)
 wait = WebDriverWait(driver, 20)
 
 class RequisicaoHorario(BaseModel):
+<<<<<<< HEAD
 solicitante_id: str  # novo campo obrigatório
 especialidade: str
 data: Optional[str] = None
 minutos_ate_disponivel: Optional[int] = 0
+=======
+    solicitante_id: str  # novo campo obrigatório
+    especialidade: str
+    data: Optional[str] = None
+    minutos_ate_disponivel: Optional[int] = 0
+>>>>>>> 0988a6f (arquivos corrigidos após erro de 'domingo’)
 
 def marcar_horario_como_enviado(solicitante_id, especialidade, data, horario):
 chave = f"{solicitante_id}:{especialidade.lower()}:{data}"
@@ -69,6 +77,7 @@ lista = json.loads(historico) if historico else []
 if horario not in lista:
 lista.append(horario)
 
+<<<<<<< HEAD
 # ⏳ Calcula quantos segundos faltam até o final do dia
 hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
 fim_do_dia = datetime.combine(hoje.date(), datetime.max.time()).replace(tzinfo=hoje.tzinfo)
@@ -76,6 +85,10 @@ segundos_ate_fim_do_dia = int((fim_do_dia - hoje).total_seconds())
 
 redis_client.setex(chave, segundos_ate_fim_do_dia, json.dumps(lista))
 
+=======
+        # ⏱ Define o tempo de expiração como 24 horas (em segundos)
+        redis_client.setex(chave, 86400, json.dumps(lista))  # 86400s = 24h
+>>>>>>> 0988a6f (arquivos corrigidos após erro de 'domingo’)
 
 
 def ja_foi_enviado(solicitante_id, especialidade, data, horario):
@@ -151,6 +164,7 @@ return False
 mes_atual_texto = mes_atual_th.text.strip().upper()  # ex: 'MAR - 2025'
 mes_desejado_texto = f"{abreviacoes_meses[target_date.month]} - {target_date.year}"
 
+<<<<<<< HEAD
 if mes_atual_texto == mes_desejado_texto:
 id_data = target_date.strftime("%d/%m/%Y")
 # Agora tenta clicar na célula da data desejada
@@ -175,6 +189,47 @@ break
 else:
 print("⚠️ Botão de próximo mês não encontrado.")
 return False
+=======
+                        if mes_atual_texto == mes_desejado_texto:
+                            id_data = target_date.strftime("%d/%m/%Y")
+                            # Agora tenta clicar na célula da data desejada
+                            try:
+                                data_element = wait.until(EC.element_to_be_clickable((By.ID, id_data)))
+                                driver.execute_script("arguments[0].scrollIntoView(true);", data_element)
+                                data_element.click()
+                                print(f"📌 Data {id_data} clicada com sucesso.")
+                                time.sleep(1.5)
+
+                                # ✅ Depois do clique na data: marca/desmarca checkbox
+                                try:
+                                    checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
+                                    driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
+                                    driver.execute_script("arguments[0].click();", checkbox)
+                                    time.sleep(1)
+                                    driver.execute_script("arguments[0].click();", checkbox)
+                                    time.sleep(2)
+                                    print("☑️ Checkbox 'Somente horários vazios' marcada/desmarcada.")
+                                except TimeoutException:
+                                    print("⚠️ Checkbox não encontrada após clicar na data.")
+                                    return False
+
+                                return True
+                            except Exception as e_data:
+                                print(f"⚠️ Falha ao clicar na data {id_data}: {e_data}")
+                                return False
+                        else:
+                            # Mês ainda não é o certo: avança
+                            botoes_direita = driver.find_elements(By.CSS_SELECTOR,
+                                                                  "table#tblCalendario th.hand.text-right")
+                            for botao in botoes_direita:
+                                if botao.get_attribute("onclick") and "changeMonth" in botao.get_attribute("onclick"):
+                                    driver.execute_script("arguments[0].click();", botao)
+                                    time.sleep(1.5)
+                                    break
+                            else:
+                                print("⚠️ Botão de próximo mês não encontrado.")
+                                return False
+>>>>>>> 0988a6f (arquivos corrigidos após erro de 'domingo’)
 
 except Exception as e:
 print(f"⚠️ Erro ao comparar/avançar mês: {e}")
@@ -222,6 +277,7 @@ print("✅ Login realizado com sucesso.")
 else:
 print("🔓 Sessão já autenticada.")
 
+<<<<<<< HEAD
 # Verifica se a checkbox está visível; se não estiver, tenta recarregar a página
 try:
 checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
@@ -256,6 +312,35 @@ driver.execute_script("""
                    el.scrollLeft = el.scrollWidth;
                }
            """)
+=======
+            # # Verifica se a checkbox está visível; se não estiver, tenta recarregar a página
+            # try:
+            #     checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
+            # except TimeoutException:
+            #     print("⚠️ Checkbox 'HVazios' não encontrada na primeira tentativa. Recarregando página...")
+            #     driver.refresh()
+            #     try:
+            #         checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
+            #     except TimeoutException:
+            #         print("❌ Checkbox ainda não apareceu. Abortando.")
+            #         return {
+            #             "erro": f"{type(e).__name__}: {str(e)}"
+            #         }
+
+            # Força recarregamento do JS marcando e desmarcando
+            # driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
+            # driver.execute_script("arguments[0].click();", checkbox)
+            # time.sleep(1)
+            # driver.execute_script("arguments[0].click();", checkbox)
+            # time.sleep(2)
+            #
+            # # Espera a tabela aparecer
+            # wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-hover")))
+            # print("☑️ Filtro 'Somente horários vazios' reativado.")
+
+            # Garante visibilidade da grade
+            driver.set_window_size(1920, 1080)
+>>>>>>> 0988a6f (arquivos corrigidos após erro de 'domingo’)
 
 for dias_adiante in range(0, 30):  # tenta pelos próximos 30 dias
 data_atual = data_base + timedelta(days=dias_adiante)
@@ -267,8 +352,28 @@ if not sucesso:
 print(f"❌ Não foi possível acessar a data {data_str}")
 continue
 
+<<<<<<< HEAD
 blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
 todos_horarios = []
+=======
+                try:
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-hover")))
+                    print("✅ Tabela de horários apareceu.")
+                except TimeoutException:
+                    print("⛔ Tabela não apareceu após seleção. Pulando para próxima data.")
+                    continue
+
+                # Garante visibilidade da grade
+                driver.execute_script("""
+                                const el = document.getElementById('contQuadro');
+                                if (el) {
+                                    el.scrollLeft = el.scrollWidth;
+                                }
+                            """)
+
+                blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
+                todos_horarios = []
+>>>>>>> 0988a6f (arquivos corrigidos após erro de 'domingo’)
 
 for bloco in blocos:
 horarios = extrair_horarios_de_bloco(bloco, especialidade)
@@ -353,4 +458,8 @@ return {
         "primeiro_horario": resultado
         "data": resultado["data"],
         "proximo_horario": resultado["proximo_horario"]
+<<<<<<< HEAD
 }
+=======
+    }
+>>>>>>> 0988a6f (arquivos corrigidos após erro de 'domingo’)

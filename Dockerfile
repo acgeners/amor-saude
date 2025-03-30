@@ -33,7 +33,10 @@ WORKDIR /app
 COPY . /app
 
 # Instala dependências Python
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip \
+ && pip install --no-cache-dir "redis>=5.0.1" \
+ && pip install --no-cache-dir -r requirements.txt
+
 
 EXPOSE 8000
 
