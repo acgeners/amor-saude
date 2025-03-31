@@ -14,7 +14,12 @@ if ! grep -q "^CHROME_PROFILE_DIR=" .env; then
   echo "CHROME_PROFILE_DIR=/app/chrome_profile_api" >> .env
 fi
 
-echo "🐳 Subindo o container..."
+echo "🧹 Limpando containers e volumes anteriores..."
 docker-compose down -v
-docker-compose up --build
+
+echo "🐳 Subindo o container com rebuild completo (sem cache)..."
+docker-compose build --no-cache
+
+docker-compose up
+
 

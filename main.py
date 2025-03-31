@@ -5,7 +5,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from typing import Union, Optional
@@ -292,8 +292,15 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                 todos_horarios = []
 
                 for bloco in blocos:
-                    horarios = extrair_horarios_de_bloco(bloco, especialidade)
-                    todos_horarios.extend(horarios)
+                    try:
+                        medico_raw = bloco.find_element(By.CSS_SELECTOR, "div")
+                        medico = medico_raw.text.strip().split("\n")[0]
+                        horarios = extrair_horarios_de_bloco(bloco, especialidade)
+                        for h in horarios:
+                            todos_horarios.append((h, medico))
+                    except (NoSuchElementException, StaleElementReferenceException) as e:
+                        print(f"⚠️ Erro ao acessar bloco: {e}. Pulando esse bloco.")
+                        continue
 
                 if not todos_horarios:
                     print(f"⚠️ Nenhum horário na data {data_str}, tentando próxima...")
@@ -308,30 +315,36 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                         return None
 
                 horarios_validos = [
-                    h for h in todos_horarios
+                    (h, m) for (h, m) in todos_horarios
                     if (dt := converter_para_datetime(h)) and dt >= limite
                 ]
 
                 if not horarios_validos:
                     continue
 
-                proximos_horarios = [
-                    h for h in horarios_validos
-                    if not ja_foi_enviado(solicitante_id, especialidade, data_str, h)
-                ]
+                proximos_horarios = sorted(
+                    [
+                        (h, m) for (h, m) in horarios_validos
+                        if not ja_foi_enviado(solicitante_id, especialidade, data_str, h)
+                    ],
+                    key=lambda x: converter_para_datetime(x[0])
+                )
 
                 if not proximos_horarios:
                     continue
 
-                proximo_horario = proximos_horarios[0]
+                proximo_horario, medico = proximos_horarios[0]
                 marcar_horario_como_enviado(solicitante_id, especialidade, data_str, proximo_horario)
 
                 return {
                     "data": data_str,
-                    "proximo_horario": proximo_horario
+                    "proximo_horario": proximo_horario,
+                    "medico": medico
                 }
 
-            return None  # nenhum horário encontrado após 30 dias
+            return {
+                "erro": "Nenhum horário encontrado após 30 dias."
+            }
 
         except Exception as e:
             traceback.print_exc()
@@ -368,6 +381,7 @@ async def n8n_horario(body: RequisicaoHorario):
     return {
         "status": "ok",
         "especialidade": body.especialidade,
+        "medico": resultado.get("medico"),
         "data": resultado.get("data"),
         "proximo_horario": resultado["proximo_horario"]
     }
