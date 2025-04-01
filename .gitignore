@@ -4,6 +4,7 @@ __pycache__/
 chrome_profile/
 chrome_profile_api/
 
+.idea
 Backup
 Backup2
 
