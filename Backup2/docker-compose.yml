@@ -4,35 +4,10 @@ services:
     container_name: amor_saude_api
     ports:
       - "8000:8000"
-    environment:
-      - PORT=8000
-    volumes:
-      - ./chrome_profile_api:/app/chrome_profile_api
     env_file:
       - .env
     shm_size: '1gb'
     restart: unless-stopped
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
-
-
-
-
-
-
-#services:
-#  amor-saude-api:
-#    build: .
-#    container_name: amor_saude_api
-#    ports:
-#      - "8000:8000"
-#    environment:
-#      - PORT=8000  # <--- Definindo a variável PORT para uso local
-#    volumes:
-#      - ./chrome_profile_api:/app/chrome_profile_api
-#    env_file:
-#      - .env
-#    shm_size: '1gb'
-#    restart: unless-stopped
 
 
 
