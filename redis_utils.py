@@ -65,8 +65,9 @@ def registrar_agendamento(usuario_id: str, especialidade: str, data: str, hora: 
 #     dados = json.loads(atual)
 #     return horario in dados.get("enviados", [])
 
-def ja_foi_enviado(usuario_id: str, especialidade: str, data: str, horario: str) -> bool:
-    chave = f"agendamento:{usuario_id}:{especialidade.lower()}:{data}:{horario}"
+def ja_foi_enviado(usuario_id: str, especialidade: str, data: str, horario: str, medico_nome: str) -> bool:
+    nome_normalizado = normalizar_nome(medico_nome)
+    chave = f"agendamento:{usuario_id}:{especialidade.lower()}:{data}:{horario}:{nome_normalizado}"
     return redis_client.exists(chave) == 1
 
 

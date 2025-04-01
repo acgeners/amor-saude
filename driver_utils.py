@@ -2,9 +2,14 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.chrome.service import Service
 import os
 import asyncio
+import logging
 
+
+# 📉 Reduz o nível de log da biblioteca selenium
+logging.getLogger("selenium").setLevel(logging.WARNING)
 
 _driver: WebDriver | None = None
 driver_lock = asyncio.Lock()
@@ -32,7 +37,13 @@ def get_driver():
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-infobars")
         options.add_argument("--disable-features=VizDisplayCompositor")
-        _driver = webdriver.Chrome(options=options)
+        options.add_argument("--log-level=3")  # Silencia logs do Chrome
+        options.add_argument("--silent")  # Silencia ainda mais logs
+
+        # 🔇 Silencia logs do ChromeDriver
+        service = Service(log_path=os.devnull)
+
+        _driver = webdriver.Chrome(service=service, options=options)
         _driver.set_window_size(1920, 1080)
         _driver.set_page_load_timeout(30)
     return _driver
