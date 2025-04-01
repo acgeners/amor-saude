@@ -4,6 +4,9 @@ __pycache__/
 chrome_profile/
 chrome_profile_api/
 
+Backup
+Backup2
+
 .DS_Store
 app_22_03.py
 app_24_03.py
