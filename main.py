@@ -4,9 +4,7 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
-import redis
-print("📦 Redis carregado de:", redis.__file__)
-print("📦 Redis versão:", redis.__version__)
+import logging
 
 # 🧭 Rotas
 from find_slot import router as slot_finder
@@ -16,10 +14,11 @@ from make_appointment import router as appointment_maker
 from code_sup import lifespan
 
 
+logging.basicConfig(level=logging.WARNING)
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=dotenv_path)
-print("🔎 REDIS_URL carregado:", os.getenv("REDIS_URL"))
 
+print("API pronta pra receber request")
 
 middleware = [
     Middleware(

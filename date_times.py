@@ -1,25 +1,9 @@
 # 🗂 Bibliotecas
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-from typing import Union, Optional
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from selenium.webdriver.support.wait import WebDriverWait
+from selenium.common.exceptions import TimeoutException
+from datetime import datetime
 import time
-import traceback
-
-
-# 🧭 Navegador
-from driver_utils import get_driver, driver_lock
-
-# 🔐 Sessão e login
-from auth_utils import sessao_ja_logada, fazer_login
-
-# 💾 Redis
-from redis_utils import registrar_agendamento, ja_foi_enviado
-
-
 
 
 abreviacoes_meses = {

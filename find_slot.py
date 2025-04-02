@@ -7,7 +7,8 @@ from typing import Union, Optional
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from selenium.webdriver.support.wait import WebDriverWait
-import traceback
+# import traceback
+import logging
 
 # 📑 Modelos e lifespan
 from code_sup import RequisicaoHorario
@@ -25,9 +26,10 @@ from redis_utils import registrar_agendamento, ja_foi_enviado
 from date_times import navegar_para_data, extrair_horarios_de_bloco
 
 # 📅 Agendamento
-from booking import extrair_consultorio_do_bloco
+# from booking import extrair_consultorio_do_bloco
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -56,7 +58,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
             else:
                 print("🔓 Sessão já autenticada.")
 
-            for dias_adiante in range(0, 30):  # tenta pelos próximos 30 dias
+            for dias_adiante in range(0, 10):  # tenta pelos próximos 10 dias
                 data_atual = data_base + timedelta(days=dias_adiante)
                 data_str = data_atual.strftime("%d/%m/%Y")
                 print(f"📆 Tentando data {data_str}...")
@@ -89,17 +91,19 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                         medico = medico_raw.text.strip().split("\n")[0]
                         horarios = extrair_horarios_de_bloco(bloco, especialidade)
 
-                        try:
-                            consultorio = extrair_consultorio_do_bloco(bloco)
-                        except Exception as e:
-                            print(f"ℹ️ Consultório não encontrado: {e}. Usando valor None.")
-                            consultorio = None  # ou "Desconhecido", "", etc.
+                        # try:
+                        #     consultorio = extrair_consultorio_do_bloco(bloco)
+                        # except Exception as e:
+                        #     logger.warning(f"ℹ️ Consultório não encontrado: {e}. Usando valor None.")
+                        #     consultorio = None  # ou "Desconhecido", "", etc.
 
                         for h in horarios:
-                            todos_horarios.append((h, medico, consultorio))
+                            todos_horarios.append((h, medico))
+                            # , consultorio
                     except (NoSuchElementException, StaleElementReferenceException) as e:
-                        print(f"⚠️ Erro ao acessar bloco: {e}. Pulando esse bloco.")
-                        continue
+                        logger.warning(f"⚠️ Erro ao acessar bloco: {e}. Pulando esse bloco.")
+
+                    continue
 
                 if not todos_horarios:
                     print(f"⚠️ Nenhum horário na data {data_str}, tentando próxima...")
@@ -114,7 +118,8 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                         return None
 
                 horarios_validos = [
-                    (h, m, c) for (h, m, c) in todos_horarios
+                    # (h, m, c) for (h, m, c) in todos_horarios
+                    (h, m) for (h, m) in todos_horarios
                     if (dt := converter_para_datetime(h)) and dt >= limite
                 ]
 
@@ -123,7 +128,8 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
 
                 proximos_horarios = sorted(
                     [
-                        (h, m, c) for (h, m, c) in horarios_validos
+                        # (h, m, c) for (h, m, c) in horarios_validos
+                        (h, m) for (h, m) in horarios_validos
                         if not ja_foi_enviado(solicitante_id, especialidade, data_str, h, m)
                     ],
                     key=lambda x: converter_para_datetime(x[0])
@@ -132,29 +138,31 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                 if not proximos_horarios:
                     continue
 
-                proximo_horario, medico, consultorio = proximos_horarios[0]
+                proximo_horario, medico = proximos_horarios[0]
+                # , consultorio
                 registrar_agendamento(
                     usuario_id=solicitante_id,
                     especialidade=especialidade,
                     data=data_str,
                     hora=proximo_horario,
                     medico_nome=medico,
-                    consultorio=consultorio
+                    consultorio=""
                 )
 
                 return {
                     "data": data_str,
                     "proximo_horario": proximo_horario,
-                    "medico": medico,
-                    "consultorio": consultorio
+                    "medico": medico
+                    # "consultorio": consultorio
                 }
 
             return {
-                "erro": "Nenhum horário encontrado após 30 dias."
+                "erro": "Nenhum horário encontrado após 10 dias."
             }
 
+
         except Exception as e:
-            traceback.print_exc()
+            logger.error(f"❌ Erro inesperado: {type(e).__name__}: {e}")
             return {
                 "erro": f"{type(e).__name__}: {str(e)}"
             }

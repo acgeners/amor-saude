@@ -5,9 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from datetime import datetime
-
-# 💾 Redis
-# from redis_utils import recuperar_agendamento
+import logging
 
 # 📑 Modelos e lifespan
 from code_sup import ConfirmacaoAgendamento
@@ -22,9 +20,12 @@ from driver_utils import get_driver, driver_lock
 from auth_utils import sessao_ja_logada, fazer_login
 
 # 📅 Agendamento
-from booking import buscar_bloco_do_profissional, preencher_paciente, confirmar_agendamento
+from booking import buscar_bloco_do_profissional, preencher_paciente, confirmar_agendamento, cadastrar_paciente
 # extrair_consultorio_do_bloco,
 
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -37,16 +38,9 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
         # Valida e converte data para datetime
         try:
             data_dt = datetime.strptime(data, "%d/%m/%Y")
-        except ValueError:
-            print("⚠️ Data em formato inválido.")
-            return None
-
-        # TODO vai usar pra alguma coisa?
-        # # Buscar dados no Redis para garantir que esse horário estava reservado
-        # dados_reserva = recuperar_agendamento(solicitante_id, especialidade, data, hora)
-        # if not dados_reserva:
-        #     print("⛔ Dados não encontrados no Redis. Pode ter expirado.")
-        #     return None
+        except ValueError as e:
+            logger.warning(f"⚠️ Data inválida: {data} - {e}")
+            return {"erro": "⚠️ Data em formato inválido."}
 
         try:
             driver.get("https://amor-saude.feegow.com/pre-v7.6/?P=AgendaMultipla&Pers=1")
@@ -65,7 +59,7 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
                 wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-hover")))
                 print("✅ Tabela de horários apareceu.")
             except TimeoutException:
-                print("⛔ Tabela não apareceu após seleção. Pulando para próxima data.")
+                logger.warning("⛔ Tabela não apareceu após seleção. Pulando para próxima data.")
 
             # Garante visibilidade da grade
             driver.execute_script("""
@@ -80,8 +74,8 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
 
 
             if not bloco_desejado:
-                print("⛔ Horário desejado com o profissional especificado não encontrado.")
-                return None
+                logger.warning("⛔ Horário desejado com o profissional especificado não encontrado.")
+                return {"erro": "Horário desejado com o profissional especificado não encontrado."}
 
             # consultorio_desejado = extrair_consultorio_do_bloco(bloco_desejado) TODO ver se vai usar
 
@@ -93,17 +87,28 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
                 botao.click()
                 print(f"✅ Clicado no horário {hora} com {nome_medico}")
             except Exception as e:
-                print(f"❌ Erro ao localizar/clicar no botão do horário: {e}")
-                return None
+                logger.warning(f"❌ Erro ao localizar/clicar no botão do horário: {e}")
+                return { "erro": "❌ Erro ao localizar/clicar no botão do horário: {e}"}
 
             print(f"Teste com: {especialidade}, {nome_medico}, {data}, {hora}, {nome_paciente}, {solicitante_id}, {data_nascimento}, "
                   f"{cpf}, {contato}.")
 
-            if not preencher_paciente(driver, wait, cpf):
-                return {"erro": "Não foi possível selecionar o paciente com o CPF informado."}
+            if not preencher_paciente(driver, wait, cpf, data_nascimento, contato):
+                print("⚠️ Tentando cadastrar o paciente...")
 
-            if not confirmar_agendamento(driver, wait):
-                return {"erro": "Não foi possível confirmar o agendamento."}
+                if not cadastrar_paciente(driver, wait, nome_paciente, cpf):
+                    return {"erro": "Paciente não encontrado e não foi possível cadastrá-lo."}
+
+                # Aguarda fechamento do modal antes de tentar novamente
+                wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "modal-content")))
+                print("✅ Modal de cadastro fechado.")
+
+                # Após cadastro, tenta selecionar o paciente novamente
+                if not preencher_paciente(driver, wait, cpf, data_nascimento, contato):
+                    return {"erro": "Paciente foi cadastrado, mas não pôde ser selecionado."}
+
+            # if not confirmar_agendamento(driver, wait):
+            #     return {"erro": "Não foi possível confirmar o agendamento."}
 
             return {
                 "especialidade": especialidade,
@@ -116,7 +121,7 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
             }
 
         except Exception as e:
-            print(f"❌ Erro durante o processo de agendamento: {e}")
+            logger.exception(f"❌ Erro inesperado durante o processo de agendamento - {e}")
             return None
 
 
