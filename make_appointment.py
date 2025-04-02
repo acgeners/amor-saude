@@ -107,8 +107,8 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
                 if not preencher_paciente(driver, wait, cpf, data_nascimento, contato):
                     return {"erro": "Paciente foi cadastrado, mas não pôde ser selecionado."}
 
-            # if not confirmar_agendamento(driver, wait):
-            #     return {"erro": "Não foi possível confirmar o agendamento."}
+            if not confirmar_agendamento(driver, wait):
+                return {"erro": "Não foi possível confirmar o agendamento."}
 
             return {
                 "especialidade": especialidade,
