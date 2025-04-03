@@ -34,7 +34,7 @@ def registrar_agendamento(usuario_id: str, especialidade: str, data: str, hora: 
 
     # ⏱ Define o tempo de expiração como 24 horas (em segundos)
     redis_client.setex(chave, ttl, json.dumps(dados))
-    print(f"💾 Agendamento armazenado em {chave} com TTL {ttl // 60} min")
+    print(f"\n💾 Horário disponível armazenado no Redis")
 
 
 def ja_foi_enviado(usuario_id: str, especialidade: str, data: str, horario: str, medico_nome: str) -> bool:

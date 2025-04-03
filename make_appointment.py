@@ -29,11 +29,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: str, data: str, hora: str,
+async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora: str,
                           nome_paciente: str, cpf: str, data_nascimento: str, contato: str):
     async with driver_lock:
         driver = get_driver()
         wait = WebDriverWait(driver, 20)
+
+        print("\n🧭 Acessando AmorSaúde...")
+        print(f"\nRealizando agendamento de consulta para {nome_paciente}:\nEspecialidade: {especialidade}\n"
+              f"Nome do Profissional: {nome_medico}\nData: {data}\nHorário: {hora}\n")
 
         # Valida e converte data para datetime
         try:
@@ -57,7 +61,7 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
 
             try:
                 wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-hover")))
-                print("✅ Tabela de horários apareceu.")
+                print("✅ Tabela de horários apareceu.\n")
             except TimeoutException:
                 logger.warning("⛔ Tabela não apareceu após seleção. Pulando para próxima data.")
 
@@ -85,40 +89,45 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
                 botao = tr_horario.find_element(By.CSS_SELECTOR, "button.btn-info")
                 driver.execute_script("arguments[0].scrollIntoView(true);", botao)
                 botao.click()
-                print(f"✅ Clicado no horário {hora} com {nome_medico}")
+                print(f"\n✅ Clicado no horário {hora} com {nome_medico}")
             except Exception as e:
                 logger.warning(f"❌ Erro ao localizar/clicar no botão do horário: {e}")
                 return { "erro": "❌ Erro ao localizar/clicar no botão do horário: {e}"}
 
-            print(f"Teste com: {especialidade}, {nome_medico}, {data}, {hora}, {nome_paciente}, {solicitante_id}, {data_nascimento}, "
-                  f"{cpf}, {contato}.")
+            # print(f"Teste com: {especialidade}, {nome_medico}, {data}, {hora}, {nome_paciente}, {solicitante_id}, {data_nascimento}, "
+            #       f"{cpf}, {contato}.")
 
-            if not preencher_paciente(driver, wait, cpf, data_nascimento, contato):
-                print("⚠️ Tentando cadastrar o paciente...")
+            preenchido = preencher_paciente(driver, wait, cpf, data_nascimento, contato)
 
-                if not cadastrar_paciente(driver, wait, nome_paciente, cpf):
-                    return {"erro": "Paciente não encontrado e não foi possível cadastrá-lo."}
+            if preenchido is False:
+                return {"erro": "Não foi possível preencher os dados obrigatórios do paciente."}
 
-                # Aguarda fechamento do modal antes de tentar novamente
-                wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "modal-content")))
-                print("✅ Modal de cadastro fechado.")
+            else:
+                if not preenchido:
+                    print("⚠️ Tentando cadastrar o paciente...")
 
-                # Após cadastro, tenta selecionar o paciente novamente
-                if not preencher_paciente(driver, wait, cpf, data_nascimento, contato):
-                    return {"erro": "Paciente foi cadastrado, mas não pôde ser selecionado."}
+                    if not cadastrar_paciente(driver, wait, nome_paciente, cpf):
+                        return {"erro": "Paciente não encontrado e não foi possível cadastrá-lo."}
 
-            if not confirmar_agendamento(driver, wait):
-                return {"erro": "Não foi possível confirmar o agendamento."}
+                    wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "modal-content")))
+                    print("✅ Modal de cadastro fechado.")
 
-            return {
-                "especialidade": especialidade,
-                "nome_medico": nome_medico,
-                # "consultorio": consultorio_desejado, TODO pode incluir isso?
-                "data": data,
-                "hora": hora,
-                "paciente": nome_paciente,
-                "status": "Agendamento concluído com sucesso"
-            }
+                    if not preencher_paciente(driver, wait, cpf, data_nascimento, contato):
+                        return {"erro": "Paciente foi cadastrado, mas não pôde ser selecionado."}
+
+
+                if not confirmar_agendamento(driver, wait):
+                    return {"erro": "Não foi possível confirmar o agendamento."}
+
+                return {
+                    "especialidade": especialidade,
+                    "nome_medico": nome_medico,
+                    # "consultorio": consultorio_desejado, TODO pode incluir isso?
+                    "data": data,
+                    "hora": hora,
+                    "paciente": nome_paciente,
+                    "status": "Agendamento concluído com sucesso"
+                }
 
         except Exception as e:
             logger.exception(f"❌ Erro inesperado durante o processo de agendamento - {e}")
@@ -128,7 +137,6 @@ async def agendar_horario(solicitante_id: str, nome_medico: str, especialidade: 
 @router.post("/make_appointment")
 async def make_appointment(body: ConfirmacaoAgendamento):
     dados = await agendar_horario(
-        solicitante_id=body.solicitante_id,
         especialidade=body.especialidade,
         nome_medico=body.nome_profissional,
         data=body.data,
@@ -141,5 +149,16 @@ async def make_appointment(body: ConfirmacaoAgendamento):
 
     if not dados:
         return {"erro": "Falha ao confirmar agendamento. Verifique os dados ou tente novamente."}
+
+    if "erro" in dados:
+        return dados
+
+    print(
+        f"\n✅ Agendamento realizado com sucesso para {body.nome_paciente}:\n"
+        f"📌 Especialidade: {dados.get('especialidade')}\n"
+        f"👨‍⚕️ Profissional: {dados.get('nome_medico')}\n"
+        f"📅 Data: {dados.get('data')}\n"
+        f"⏰ Horário: {dados.get('hora')}"
+    )
 
     return {"status": "confirmado", "detalhes": dados}

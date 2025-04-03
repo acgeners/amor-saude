@@ -1,3 +1,40 @@
+#services:
+#  selenium:
+#    image: selenium/standalone-chrome:latest
+#    container_name: selenium_chrome
+#    ports:
+#      - "4444:4444"   # Porta para o WebDriver
+#      - "5900:5900"   # Porta para acesso via VNC
+#      - "7900:7900"
+#    shm_size: '2gb'
+#    restart: unless-stopped
+#
+#  amor-saude-api:
+#    build: .
+#    container_name: amor_saude_api
+#    ports:
+#      - "8000:8000"
+#    environment:
+#      - PORT=8000
+#      - SELENIUM_REMOTE_URL=http://selenium:4444/wd/hub
+#    volumes:
+#      - ./chrome_profile_api:/app/chrome_profile_api
+#    env_file:
+#      - .env
+#    shm_size: '1gb'
+#    restart: unless-stopped
+#    command: uvicorn main:app --host 0.0.0.0 --port 8000 --log-level warning
+
+
+
+
+
+
+
+
+
+
+
 services:
   amor-saude-api:
     build: .
@@ -13,56 +50,3 @@ services:
     shm_size: '1gb'
     restart: unless-stopped
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --log-level warning
-
-
-
-
-
-
-#services:
-#  amor-saude-api:
-#    build: .
-#    container_name: amor_saude_api
-#    ports:
-#      - "8000:8000"
-#    environment:
-#      - PORT=8000  # <--- Definindo a variável PORT para uso local
-#    volumes:
-#      - ./chrome_profile_api:/app/chrome_profile_api
-#    env_file:
-#      - .env
-#    shm_size: '1gb'
-#    restart: unless-stopped
-
-
-
-
-##version: "3.9"
-#
-#services:
-#  amor-saude-api:
-#    build: .
-#    ports:
-#      - "8000:8000"
-#    env_file:
-#      - .env.secreto
-#    volumes:
-#      - ./chrome_profile_api:/app/chrome_profile_api
-
-
-
-
-
-
-#version: "3.9"
-#
-#services:
-#  amor-saude-api:
-#    build: .
-#    container_name: amor-saude-api
-#    ports:
-#      - "8000:8000"
-#    env_file:
-#      - .env.secreto
-#    volumes:
-#      - ./chrome_profile:/app/chrome_profile

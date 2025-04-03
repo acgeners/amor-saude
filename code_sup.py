@@ -5,7 +5,7 @@ import os
 from pydantic import BaseModel
 
 # 🧭 Navegador
-from driver_utils import fechar_driver
+from driver_utils_continuar import fechar_driver
 
 
 @asynccontextmanager

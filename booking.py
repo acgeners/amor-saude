@@ -1,4 +1,6 @@
 # 🗂 Bibliotecas
+import re
+
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -62,136 +64,6 @@ def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: 
     return None
 
 
-# def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
-#     try:
-#         print("🟢 Iniciando preenchimento de paciente...")
-#
-#         # Aguarda e rola até o campo do select2
-#         # Dentro da função preencher_paciente:
-#         print("🔸 Buscando campo select2 do paciente...")
-#         campo_paciente = wait.until(
-#             EC.visibility_of_element_located((
-#                 By.CSS_SELECTOR,
-#                 "span.select2-selection--single[aria-labelledby='select2-PacienteID-container']"
-#             ))
-#         )
-#         driver.execute_script("arguments[0].scrollIntoView(true);", campo_paciente)
-#         ActionChains(driver).move_to_element(campo_paciente).click().perform()
-#         print("✅ Campo select2 do paciente clicado com sucesso.")
-#
-#         # Encontra o campo de input do select2
-#         print("🔸 Buscando input para digitar o CPF...")
-#         input_paciente = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input.select2-search__field")))
-#         input_paciente.send_keys(cpf)
-#         print(f"🔎 CPF digitado: {cpf}")
-#
-#         # Aguarda opções reais (não "Searching…")
-#         print("🔸 Aguardando opções visíveis diferentes de 'searching'...")
-#         max_tentativas = 10
-#         for tentativas in range(max_tentativas):
-#             opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
-#             opcoes_visiveis = [op for op in opcoes if op.is_displayed() and op.text.strip()]
-#
-#             print(f"🔍 Tentativa {tentativas + 1} — {len(opcoes_visiveis)} opção(ões) visível(is):")
-#             for i, op in enumerate(opcoes_visiveis):
-#                 texto = op.text.strip()
-#                 html = op.get_attribute("innerHTML")
-#                 print(f"  ▶️ [{i}] Texto: {texto}")
-#                 print(f"     HTML: {html[:300]}{'...' if len(html) > 300 else ''}")  # Limita o tamanho do HTML no log
-#
-#             if opcoes_visiveis:
-#                 primeiro_texto = opcoes_visiveis[0].text.strip().lower()
-#                 if "searching" not in primeiro_texto:
-#                     break
-#
-#             time.sleep(0.5)
-#         else:
-#             print("⛔ Nenhuma opção válida apareceu após aguardar.")
-#             return False
-#
-#         # Rebusca a lista final para evitar stale element
-#         print("🔸 Rebuscando lista final de opções...")
-#         opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
-#         opcoes_visiveis = [op for op in opcoes if op.is_displayed() and op.text.strip()]
-#         if not opcoes_visiveis:
-#             print("⛔ Nenhuma opção visível final encontrada.")
-#             return False
-#
-#         primeira_opcao = opcoes_visiveis[0]
-#         texto_opcao = primeira_opcao.text.strip().lower()
-#         html_opcao = primeira_opcao.get_attribute('innerHTML')
-#         outer_html = primeira_opcao.get_attribute('outerHTML')
-#         print(f"🔍 Primeira opção final (texto): {texto_opcao}")
-#         print(f"🔍 Primeira opção final (HTML interno): {html_opcao[:300]}{'...' if len(html_opcao) > 300 else ''}")
-#         print(f"🖱️ HTML do item que será clicado (outerHTML):\n{outer_html}")
-#
-#         # Verifica se a primeira opção é 'Nenhum resultado'
-#         if "nenhum resultado" in texto_opcao:
-#             print("⚠️ Primeira opção indica que o paciente não foi encontrado.")
-#             return False
-#
-#         try:
-#             botao_inserir = primeira_opcao.find_element(By.CLASS_NAME, "btn-inserir-si")
-#             if botao_inserir.is_displayed():
-#                 print("⚠️ Botão de inserir visível na primeira opção. Vai seguir para cadastro.")
-#                 return False
-#         except NoSuchElementException:
-#             print("✅ Nenhum botão de inserir encontrado — é um paciente válido.")
-#
-#         # Clica na opção
-#         print("🖱️ Clicando na opção do paciente...")
-#         primeira_opcao.click()
-#         print("✅ Paciente selecionado.")
-#
-#         # Preenche data de nascimento, se necessário
-#         if data_nascimento:
-#             print("🔸 Verificando campo de data de nascimento...")
-#             input_nascimento = wait.until(EC.presence_of_element_located((By.ID, "ageNascimento")))
-#             if not input_nascimento.get_attribute("value").strip():
-#                 input_nascimento.clear()
-#                 input_nascimento.send_keys(data_nascimento)
-#                 print(f"📅 Data de nascimento preenchida: {data_nascimento}")
-#             else:
-#                 print("📅 Data de nascimento já estava preenchida.")
-#
-#         # Preenche celular, se necessário
-#         if celular:
-#             print("🔸 Verificando campo de celular...")
-#             input_celular = driver.find_element(By.ID, "ageCel1")
-#             if not input_celular.get_attribute("value").strip():
-#                 input_celular.clear()
-#                 input_celular.send_keys(celular)
-#                 print(f"📱 Celular preenchido: {celular}")
-#             else:
-#                 print("📱 Celular já estava preenchido.")
-#
-#         # Seleciona subcanal "Whatsapp"
-#         print("🔸 Verificando subcanal...")
-#         try:
-#             select_subcanal = Select(wait.until(EC.presence_of_element_located((By.ID, "SubCanal"))))
-#             valor_atual = select_subcanal.first_selected_option.text.strip().lower()
-#             if "selecione" in valor_atual:
-#                 for option in select_subcanal.options:
-#                     if "whatsapp" in option.text.lower():
-#                         select_subcanal.select_by_visible_text(option.text)
-#                         print(f"📨 Subcanal selecionado: {option.text}")
-#                         break
-#             else:
-#                 print(f"📨 Subcanal já estava selecionado: {valor_atual}")
-#         except Exception as e:
-#             print(f"⚠️ Erro ao selecionar subcanal: {e}")
-#
-#         print("✅ Finalizado preenchimento de paciente com sucesso.")
-#         return True
-#
-#     except TimeoutException:
-#         print("⛔ Tempo excedido ao tentar preencher o paciente.")
-#         return False
-#     except Exception as e:
-#         print(f"❌ Erro ao preencher o paciente: {e}")
-#         return False
-
-
 def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
     try:
         print("🟢 Iniciando preenchimento de paciente...")
@@ -200,7 +72,7 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
             return False
 
         print("🔸 Aguardando opções visíveis diferentes de 'searching'...")
-        max_tentativas = 10
+        max_tentativas = 4
         for tentativas in range(max_tentativas):
             opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
             opcoes_visiveis = [op for op in opcoes if op.is_displayed() and op.text.strip()]
@@ -208,9 +80,9 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
             print(f"🔍 Tentativa {tentativas + 1} — {len(opcoes_visiveis)} opção(ões) visível(is):")
             for i, op in enumerate(opcoes_visiveis):
                 texto = op.text.strip()
-                html = op.get_attribute("innerHTML")
+                # html = op.get_attribute("innerHTML")
                 print(f"  ▶️ [{i}] Texto: {texto}")
-                print(f"     HTML: {html[:300]}{'...' if len(html) > 300 else ''}")
+                # print(f"     HTML: {html[:300]}{'...' if len(html) > 300 else ''}")
 
             if opcoes_visiveis:
                 primeiro_texto = opcoes_visiveis[0].text.strip().lower()
@@ -231,8 +103,8 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
 
         primeira_opcao = opcoes_visiveis[0]
         texto_opcao = primeira_opcao.text.strip().lower()
-        print(f"🔍 Primeira opção final (texto): {texto_opcao}")
-        print(f"🖱️ HTML do item que será clicado:\n{primeira_opcao.get_attribute('outerHTML')}")
+        print(f"🔍 Primeira opção final: {texto_opcao}")
+        # print(f"🖱️ HTML do item que será clicado:\n{primeira_opcao.get_attribute('outerHTML')}")
 
         if "nenhum resultado" in texto_opcao:
             print("⚠️ Primeira opção indica que o paciente não foi encontrado.")
@@ -249,38 +121,147 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
         primeira_opcao.click()
         print("✅ Paciente selecionado.")
 
+        # 📅 Data de nascimento
         if data_nascimento:
-            input_nascimento = wait.until(EC.presence_of_element_located((By.ID, "ageNascimento")))
-            if not input_nascimento.get_attribute("value").strip():
-                input_nascimento.clear()
-                input_nascimento.send_keys(data_nascimento)
-                print(f"📅 Data de nascimento preenchida: {data_nascimento}")
+            # Expressão regular para capturar dd/mm/yyyy
+            padrao_data = r"\d{2}/\d{2}/\d{4}"
 
+            # Se achar a data dentro do texto, pula o preenchimento
+            if re.search(padrao_data, texto_opcao):
+                print("Data de nascimento já presente no texto do paciente. Pulando preenchimento...")
+            else:
+                try:
+                    # Aguarda até que o input esteja visível
+                    input_nascimento = wait.until(EC.visibility_of_element_located((By.ID, "ageNascimento")))
+                    print(f"Imput data de nascimento: {input_nascimento.text}")
+                    if not input_nascimento.get_attribute("value").strip():
+                        input_nascimento.clear()
+                        input_nascimento.send_keys(data_nascimento)
+                        print(f"📅 Data de nascimento preenchida: {data_nascimento}")
+                except Exception as e:
+                    print(f"⚠️ Erro ao preencher data de nascimento: {e}")
+
+        # 📱 Celular
         if celular:
-            input_celular = driver.find_element(By.ID, "ageCel1")
-            if not input_celular.get_attribute("value").strip():
-                input_celular.clear()
-                input_celular.send_keys(celular)
-                print(f"📱 Celular preenchido: {celular}")
+            try:
+                input_celular = wait.until(EC.visibility_of_element_located((By.ID, "ageCel1")))
+                if not input_celular.get_attribute("value").strip():
+                    input_celular.clear()
+                    input_celular.send_keys(celular)
+                    print(f"📱 Celular preenchido: {celular}")
+            except Exception as e:
+                print(f"⚠️ Erro ao preencher celular: {e}")
 
+        # 📨 Subcanal
         try:
-            select_subcanal = Select(wait.until(EC.presence_of_element_located((By.ID, "SubCanal"))))
-            valor_atual = select_subcanal.first_selected_option.text.strip().lower()
-            if "selecione" in valor_atual:
+            select_subcanal = Select(wait.until(EC.visibility_of_element_located((By.ID, "SubCanal"))))
+            # Imprime o valor atualmente selecionado
+            valor_atual = select_subcanal.first_selected_option.text.strip()
+            print(f"Valor atual do Subcanal: '{valor_atual}'")
+
+            # Imprime todas as opções disponíveis
+            for option in select_subcanal.options:
+                print(f"Opção encontrada: '{option.text.strip()}'")
+
+            # Se a opção atual indicar que nenhuma opção foi selecionada, seleciona a opção que contenha "whatsapp"
+            if "selecione" in valor_atual.lower():
+                opcao_encontrada = False
                 for option in select_subcanal.options:
-                    if "whatsapp" in option.text.lower():
+                    texto_opcao = option.text.lower().strip()
+                    # Ajuste aqui para corresponder ao que realmente aparece no HTML ("whatspp", "whatsapp", etc.)
+                    if "whatspp" in texto_opcao or "whatsapp" in texto_opcao:
                         select_subcanal.select_by_visible_text(option.text)
                         print(f"📨 Subcanal selecionado: {option.text}")
+                        opcao_encontrada = True
                         break
+                if not opcao_encontrada:
+                    print("⚠️ Não foi encontrada nenhuma opção contendo 'whatspp' ou 'whatsapp'.")
         except Exception as e:
             print(f"⚠️ Erro ao selecionar subcanal: {e}")
+
+        # 📑 Tabela/Parceria
+        try:
+            tabela_select = wait.until(EC.element_to_be_clickable((By.ID, "ageTabela")))
+            tabela_select.click()
+            select_tabela = Select(tabela_select)
+            select_tabela.select_by_visible_text("PARTICULAR*")
+            print("📑 Tabela/Parceria selecionada.")
+        except Exception as e:
+            logger.warning(f"⚠️ Erro ao selecionar Tabela/Parceria: {e}")
+
+        # 🩺 Procedimento
+        # Etapa B - Procedimento
+
+        max_tentativas = 3
+        for tentativa in range(max_tentativas):
+            try:
+                procedimento_container = wait.until(EC.element_to_be_clickable((
+                    By.XPATH,
+                    "//div[@id='divAgendamentoCheckin']//span[contains(@class, 'select2-selection') and contains(@class, 'select2-selection--single')]"
+                )))
+
+                print("🖱️ Container de Procedimento encontrado. Clicando para abrir dropdown...")
+                # Rola a tela para que o elemento fique visível
+                driver.execute_script("arguments[0].scrollIntoView(true);", procedimento_container)
+                time.sleep(1)  # Pequeno delay para estabilizar a rolagem
+                procedimento_container.click()
+
+                print("🔸 Aguardando opções visíveis diferentes de 'searching'...")
+
+                for espera in range(10):
+                    opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
+                    opcoes_visiveis = [op.text.strip() for op in opcoes if op.is_displayed() and op.text.strip()]
+
+                    print(f"🔍 Tentativa {tentativa + 1} — {len(opcoes_visiveis)} opção(ões) visível(is):")
+
+                    for i, texto in enumerate(opcoes_visiveis):
+                        print(f"  ▶️ [{i}] Texto: {texto}")
+
+                    if opcoes_visiveis:
+                        primeiro_texto = opcoes_visiveis[0].lower()
+                        if "searching" not in primeiro_texto:
+                            break
+
+                    time.sleep(0.5)
+                else:
+                    print("⛔ Nenhuma opção válida apareceu após aguardar.")
+                    return False
+
+                print("🔸 Rebuscando lista final de opções...")
+                opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
+                index_consulta = -1
+                for idx, op in enumerate(opcoes):
+                    if op.is_displayed():
+                        texto = op.text.strip().lower()
+                        if "consulta" in texto:
+                            index_consulta = idx
+                            break
+
+                if index_consulta == -1:
+                    print("⛔ Nenhuma opção contendo 'consulta' foi encontrada.")
+                    return False
+
+                # Rebuscar o elemento para evitar stale reference
+                opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
+                opcao_alvo = opcoes[index_consulta]
+                texto_final = opcao_alvo.text.strip()
+                opcao_alvo.click()
+                print(f"✅ Procedimento selecionado: {texto_final}")
+
+                # Se tudo ocorreu sem exceção, saia do loop de retry
+                break
+
+            except Exception as e:
+                print(f"⛔ Erro ao selecionar Procedimento: {e}")
+                return False
+
+        else:
+            print("⛔ Falha ao selecionar o procedimento após várias tentativas.")
+            return False
 
         print("✅ Preenchimento de paciente concluído.")
         return True
 
-    except TimeoutException:
-        print("⛔ Tempo excedido ao tentar preencher o paciente.")
-        return False
     except Exception as e:
         print(f"❌ Erro ao preencher o paciente: {e}")
         return False
@@ -342,7 +323,7 @@ def abrir_select2_paciente(driver, wait, cpf):
         ))
         input_paciente.clear()
         input_paciente.send_keys(cpf)
-        print(f"🔎 CPF digitado no select2: {cpf}")
+        print(f"🔎 CPF digitado: {cpf}")
 
         return True
 
@@ -351,18 +332,54 @@ def abrir_select2_paciente(driver, wait, cpf):
         return False
 
 
-
 def confirmar_agendamento(driver, wait):
     try:
-        # Aguarda o botão ficar disponível e clicável
+        # Aguarda o botão "Salvar" ficar clicável, rola até ele e realiza o clique
         botao_salvar = wait.until(EC.element_to_be_clickable((By.ID, "btnSalvarAgenda")))
         driver.execute_script("arguments[0].scrollIntoView(true);", botao_salvar)
         botao_salvar.click()
         print("✅ Clique no botão 'Salvar' realizado.")
 
-        # Aguarda feedback da página
-        wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "modal-content")))
-        print("✅ Modal de agendamento fechado. Agendamento provavelmente concluído.")
+        # Verifica se aparece um pop-up de erro logo após clicar (aguarda até 5 segundos)
+        try:
+            erro_popup = wait.until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, "div.ui-pnotify.alert-danger"))
+            )
+            titulo_erro = erro_popup.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
+            mensagem_erro = erro_popup.find_element(By.CSS_SELECTOR, "div.ui-pnotify-text").text
+            print("⛔ Erro ao salvar agendamento:")
+            print("   Título:", titulo_erro)
+            print("   Mensagem:", mensagem_erro)
+            return False
+        except TimeoutException:
+            # Caso não apareça erro, prossegue com o fluxo
+            pass
+
+        # Aguarda a aparição do pop-up de sucesso
+        try:
+            pop_up_sucesso = wait.until(
+                EC.visibility_of_element_located(
+                    (By.CSS_SELECTOR, "div.alert.ui-pnotify-container.alert-success")
+                )
+            )
+            titulo_sucesso = pop_up_sucesso.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
+            print("✅ Pop-up de sucesso detectado:", titulo_sucesso)
+        except TimeoutException:
+            print("⚠️ Pop-up de sucesso não apareceu.")
+
+        # # Verifica na listagem se o agendamento foi realizado (ajuste o XPath conforme necessário)
+        # try:
+        #     novo_agendamento = wait.until(
+        #         EC.visibility_of_element_located((
+        #             By.XPATH,
+        #             "//table[@id='listaAgendamentos']//tr[td[contains(text(),'Consulta')]]"
+        #         ))
+        #     )
+        #     print("✅ Agendamento encontrado na lista:", novo_agendamento.text)
+        # except TimeoutException:
+        #     print("⛔ Agendamento não foi listado na página.")
+        #     return False
+
         return True
 
     except TimeoutException:
@@ -371,6 +388,41 @@ def confirmar_agendamento(driver, wait):
     except Exception as e:
         print(f"❌ Erro ao tentar clicar no botão 'Salvar': {e}")
         return False
+
+# def confirmar_agendamento(driver, wait):
+#     try:
+#         # Aguarda o botão ficar disponível e clicável
+#         botao_salvar = wait.until(EC.element_to_be_clickable((By.ID, "btnSalvarAgenda")))
+#         driver.execute_script("arguments[0].scrollIntoView(true);", botao_salvar)
+#         botao_salvar.click()
+#         print("✅ Clique no botão 'Salvar' realizado.")
+#
+#         try:
+#             # Aguarda até que o pop-up de erro esteja visível (tempo máximo de 10 segundos)
+#             erro_popup = wait.until(
+#                 EC.visibility_of_element_located((By.CSS_SELECTOR, "div.ui-pnotify.alert-danger"))
+#             )
+#
+#             # Extrai o título do erro e a mensagem
+#             titulo_erro = erro_popup.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
+#             mensagem_erro = erro_popup.find_element(By.CSS_SELECTOR, "div.ui-pnotify-text").text
+#
+#             print("Título do Erro:", titulo_erro)
+#             print("Mensagem do Erro:", mensagem_erro)
+#         except Exception as e:
+#             print("Pop-up de erro não encontrado:", e)
+#
+#         # Aguarda feedback da página
+#         wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "modal-content")))
+#         print("✅ Modal de agendamento fechado. Agendamento provavelmente concluído.")
+#         return True
+#
+#     except TimeoutException:
+#         print("⛔ Botão 'Salvar' não apareceu a tempo.")
+#         return False
+#     except Exception as e:
+#         print(f"❌ Erro ao tentar clicar no botão 'Salvar': {e}")
+#         return False
 
 
 

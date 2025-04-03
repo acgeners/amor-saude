@@ -22,3 +22,12 @@ docker-compose build --no-cache
 
 docker-compose up
 
+## Verifica se o container já existe
+#if [ "$(docker ps -a -q -f name=${SERVICE_NAME})" ]; then
+#    echo "Container já existe, iniciando..."
+#    docker-compose start
+#else
+#    echo "Container não encontrado, criando e iniciando..."
+#    docker-compose up --build
+#fi
+

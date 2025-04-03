@@ -28,7 +28,7 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
         especialidade_prof = linhas[1] if len(linhas) > 1 else ""
 
         print(f"🔍 Profissional detectado: {nome}")
-        print(especialidade_prof)
+        # print(especialidade_prof)
 
         if especialidade.lower() in especialidade_prof:
             botoes = bloco.find_elements(By.CSS_SELECTOR, ".btn-info")
@@ -42,7 +42,7 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
                     print(f"⚠️ Botão obsoleto ignorado: {e}")
 
     except Exception as e:
-        print(f"⚠️ Erro ao processar bloco: {e}")
+        print(f"⚠️ Erro ao processar bloco ({type(e).__name__})")
 
     return horarios
 

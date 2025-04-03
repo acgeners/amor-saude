@@ -41,7 +41,13 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
         # TODO só se der problema nas abas
         # garantir_aba_principal(driver)  # 🧠 Garante que estamos na aba certa
 
-        print("🧭 Acessando AmorSaúde...")
+        if data:
+            buscar_data = data
+        else:
+            buscar_data = datetime.today().strftime('%d/%m/%Y')  # ou outro formato que você usa
+
+        print("\n🧭 Acessando AmorSaúde...")
+        print(f"\nBuscando horário disponivel para:\nEspecialidade: {especialidade}\nData: {buscar_data}\n")
 
         # ⚙️ Limpa ambiente entre chamadas
         agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
@@ -69,7 +75,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
 
                 try:
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-hover")))
-                    print("✅ Tabela de horários apareceu.")
+                    print("✅ Tabela de horários apareceu.\n")
                 except TimeoutException:
                     print("⛔ Tabela não apareceu após seleção. Pulando para próxima data.")
                     continue
@@ -101,7 +107,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                             todos_horarios.append((h, medico))
                             # , consultorio
                     except (NoSuchElementException, StaleElementReferenceException) as e:
-                        logger.warning(f"⚠️ Erro ao acessar bloco: {e}. Pulando esse bloco.")
+                        logger.warning(f"⚠️ Erro ao acessar bloco ({type(e).__name__}) Pulando esse bloco.")
 
                     continue
 
@@ -198,6 +204,13 @@ async def find_slot(body: RequisicaoHorario):
             "status": "erro",
             "mensagem": resultado["erro"]
         }
+
+    print(
+        f"\n✅ Horário disponível encontrado para {body.especialidade}:\n"
+        f"👨‍⚕️ Profissional: {resultado.get('medico')}\n"
+        f"📅 Data: {resultado.get('data')}\n"
+        f"⏰ Horário: {resultado.get('proximo_horario')}\n"
+    )
 
     return {
         "status": "ok",
