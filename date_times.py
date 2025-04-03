@@ -39,7 +39,7 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
                         print(texto)
                         horarios.append(texto)
                 except Exception as e:
-                    print(f"⚠️ Botão obsoleto ignorado: {e}")
+                    print(f"⚠️ Botão obsoleto ignorado ({type(e).__name__})")
 
     except Exception as e:
         print(f"⚠️ Erro ao processar bloco ({type(e).__name__})")

@@ -17,7 +17,7 @@ async def lifespan(_: FastAPI):
         try:
             fechar_driver()  # ou driver.quit()
         except Exception as e:
-            print(f"Erro ao encerrar o driver: {e}")
+            print(f"Erro ao encerrar o driver ({type(e).__name__})")
     else:
         print("⚠️ Ambiente de produção — mantendo driver em execução.")
 
@@ -29,7 +29,7 @@ class RequisicaoHorario(BaseModel):
     minutos_ate_disponivel: int | None = 0
 
 class ConfirmacaoAgendamento(BaseModel):
-    solicitante_id: str
+    matricula: str | None = None
     especialidade: str
     data: str
     hora: str
@@ -37,6 +37,13 @@ class ConfirmacaoAgendamento(BaseModel):
     CPF: str
     data_nascimento: str
     contato: str
+    nome_profissional: str
+
+class CancelarAgendamento(BaseModel):
+    especialidade: str
+    data: str
+    hora: str
+    nome_paciente: str
     nome_profissional: str
 
 # class RequisicaoHorario(BaseModel):

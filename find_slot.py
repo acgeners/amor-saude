@@ -168,9 +168,9 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
 
 
         except Exception as e:
-            logger.error(f"❌ Erro inesperado: {type(e).__name__}: {e}")
+            logger.error(f"❌ Erro inesperado: {type(e).__name__}")
             return {
-                "erro": f"{type(e).__name__}: {str(e)}"
+                "erro": f"{type(e).__name__}"
             }
 
 

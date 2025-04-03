@@ -1,20 +1,28 @@
-.env.secreto
-.env
+# Pastas
 __pycache__/
 chrome_profile/
 chrome_profile_api/
-
 .idea
 Backup
 Backup2
+Render
 
-.DS_Store
+
+# Variaveis e Ambiente
+.env.secreto
+.env
+docker-compose.override.yml
+docker-compose.yml
+run-local-cmd.sh
+run-local.sh
+run.sh
+
+
+# Arquivos .py não necessários
 app_22_03.py
 app_24_03.py
 app_25_03.py
-dump.rdb
 list_files.py
-lista_arquivos.txt
 main(retornar_nome).py
 main_2503.py
 main_25_03.py
@@ -22,6 +30,16 @@ main_2803.py
 main_3103.py
 new.py
 redis_db.py
-request_data_asp.txt
-driver_utils_continuar.py
 clear_redis.py
+cancel_appointment.py
+
+
+
+# Outros arquivos
+.DS_Store
+dump.rdb
+lista_arquivos.txt
+request_data_asp.txt
+.env.bak
+README.md
+env.txt

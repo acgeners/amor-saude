@@ -4,7 +4,7 @@ import re
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support.ui import Select
 from typing import Optional
 import logging
@@ -25,16 +25,17 @@ def extrair_consultorio_do_bloco(bloco) -> Optional[str]:
         if texto:
             return texto.split("\n")[0]  # Em geral, só queremos a linha com o nome do consultório
     except Exception as e:
-        logger.warning(f"⚠️ Não foi possível extrair o consultório - {e}")
+        logger.warning(f"⚠️ Não foi possível extrair o consultório ({type(e).__name__})")
         return None
 
 
-def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: str, hora: str):
+def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: str, hora: str, agendamento_realizado):
     """
     Busca o bloco do profissional específico, com a especialidade e horário desejado.
     Retorna o bloco correspondente ou None.
     """
     for bloco in blocos:
+        time.sleep(1)
         try:
             painel = bloco.find_elements(By.CSS_SELECTOR, ".panel-title")
             if not painel:
@@ -52,19 +53,22 @@ def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: 
             if especialidade.lower() not in especialidade_bloco.lower():
                 continue
 
+            if agendamento_realizado:
+                return bloco
+
             # Verifica se o horário desejado está disponível
             horarios_disponiveis = extrair_horarios_de_bloco(bloco, especialidade)
             if hora in horarios_disponiveis:
                 return bloco
 
         except Exception as e:
-            print(f"⚠️ Erro ao analisar bloco: {e}")
+            print(f"⚠️ Erro ao analisar bloco ({type(e).__name__})")
             continue
 
     return None
 
 
-def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
+def preencher_paciente(driver, wait, cpf, matricula, data_nascimento, celular):
     try:
         print("🟢 Iniciando preenchimento de paciente...")
 
@@ -72,6 +76,7 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
             return False
 
         print("🔸 Aguardando opções visíveis diferentes de 'searching'...")
+        time.sleep(1)
         max_tentativas = 4
         for tentativas in range(max_tentativas):
             opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
@@ -89,7 +94,7 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
                 if "searching" not in primeiro_texto:
                     break
 
-            time.sleep(0.5)
+            time.sleep(1)
         else:
             print("⛔ Nenhuma opção válida apareceu após aguardar.")
             return False
@@ -97,6 +102,7 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
         print("🔸 Rebuscando lista final de opções...")
         opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
         opcoes_visiveis = [op for op in opcoes if op.is_displayed() and op.text.strip()]
+        time.sleep(1)
         if not opcoes_visiveis:
             print("⛔ Nenhuma opção visível final encontrada.")
             return False
@@ -120,7 +126,7 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
 
         primeira_opcao.click()
         print("✅ Paciente selecionado.")
-
+# ___________________________________________________________________________________________________________________
         # 📅 Data de nascimento
         if data_nascimento:
             # Expressão regular para capturar dd/mm/yyyy
@@ -132,15 +138,15 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
             else:
                 try:
                     # Aguarda até que o input esteja visível
+                    time.sleep(1)
                     input_nascimento = wait.until(EC.visibility_of_element_located((By.ID, "ageNascimento")))
-                    print(f"Imput data de nascimento: {input_nascimento.text}")
                     if not input_nascimento.get_attribute("value").strip():
                         input_nascimento.clear()
                         input_nascimento.send_keys(data_nascimento)
                         print(f"📅 Data de nascimento preenchida: {data_nascimento}")
                 except Exception as e:
-                    print(f"⚠️ Erro ao preencher data de nascimento: {e}")
-
+                    print(f"⚠️ Erro ao preencher data de nascimento ({type(e).__name__})")
+# ___________________________________________________________________________________________________________________
         # 📱 Celular
         if celular:
             try:
@@ -150,8 +156,9 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
                     input_celular.send_keys(celular)
                     print(f"📱 Celular preenchido: {celular}")
             except Exception as e:
-                print(f"⚠️ Erro ao preencher celular: {e}")
-
+                logger.warning(f"⚠️ Erro ao preencher celular ({type(e).__name__})")
+                return False
+# ___________________________________________________________________________________________________________________
         # 📨 Subcanal
         try:
             select_subcanal = Select(wait.until(EC.visibility_of_element_located((By.ID, "SubCanal"))))
@@ -176,22 +183,45 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
                         break
                 if not opcao_encontrada:
                     print("⚠️ Não foi encontrada nenhuma opção contendo 'whatspp' ou 'whatsapp'.")
+                    return False
         except Exception as e:
-            print(f"⚠️ Erro ao selecionar subcanal: {e}")
+            logger.warning(f"⚠️ Erro ao selecionar subcanal ({type(e).__name__})")
+            return False
+#___________________________________________________________________________________________________________________
+        if matricula:
+            # 📑 Tabela/Parceria
+            try:
+                tabela_select = wait.until(EC.element_to_be_clickable((By.ID, "ageTabela")))
+                tabela_select.click()
+                select_tabela = Select(tabela_select)
+                select_tabela.select_by_visible_text("Cartão de TODOS*")
+                print("📑 Tabela/Parceria definida como 'Cartão de TODOS*'.")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao selecionar Tabela/Parceria ({type(e).__name__})")
 
-        # 📑 Tabela/Parceria
-        try:
-            tabela_select = wait.until(EC.element_to_be_clickable((By.ID, "ageTabela")))
-            tabela_select.click()
-            select_tabela = Select(tabela_select)
-            select_tabela.select_by_visible_text("PARTICULAR*")
-            print("📑 Tabela/Parceria selecionada.")
-        except Exception as e:
-            logger.warning(f"⚠️ Erro ao selecionar Tabela/Parceria: {e}")
+            # 🪪 Matricula
+            try:
+                input_matricula = wait.until(EC.visibility_of_element_located((By.ID, "ageCel1")))
+                if not input_matricula.get_attribute("value").strip():
+                    input_matricula.clear()
+                    input_matricula.send_keys(matricula)
+                    print(f"🪪 Matricula preenchido: {matricula}")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao preencher matricula ({type(e).__name__})")
 
+        else:
+            try:
+                tabela_select = wait.until(EC.element_to_be_clickable((By.ID, "ageTabela")))
+                tabela_select.click()
+                select_tabela = Select(tabela_select)
+                select_tabela.select_by_visible_text("PARTICULAR*")
+                print("📑 Tabela/Parceria definida como 'PARTICULAR*'.")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao selecionar Tabela/Parceria ({type(e).__name__})")
+# ___________________________________________________________________________________________________________________
         # 🩺 Procedimento
-        # Etapa B - Procedimento
 
+        time.sleep(1)
         max_tentativas = 3
         for tentativa in range(max_tentativas):
             try:
@@ -210,9 +240,11 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
 
                 for espera in range(10):
                     opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
-                    opcoes_visiveis = [op.text.strip() for op in opcoes if op.is_displayed() and op.text.strip()]
+                    opcoes_visiveis = [op.text.strip() for op in opcoes if
+                                       op.is_displayed() and op.text.strip()]
 
                     print(f"🔍 Tentativa {tentativa + 1} — {len(opcoes_visiveis)} opção(ões) visível(is):")
+                    time.sleep(1)
 
                     for i, texto in enumerate(opcoes_visiveis):
                         print(f"  ▶️ [{i}] Texto: {texto}")
@@ -247,23 +279,20 @@ def preencher_paciente(driver, wait, cpf, data_nascimento, celular):
                 texto_final = opcao_alvo.text.strip()
                 opcao_alvo.click()
                 print(f"✅ Procedimento selecionado: {texto_final}")
-
-                # Se tudo ocorreu sem exceção, saia do loop de retry
-                break
+                return True
 
             except Exception as e:
-                print(f"⛔ Erro ao selecionar Procedimento: {e}")
+                print(f"⛔ Erro ao selecionar Procedimento ({type(e).__name__})")
                 return False
 
         else:
             print("⛔ Falha ao selecionar o procedimento após várias tentativas.")
             return False
+        # ___________________________________________________________________________________________________________________
 
-        print("✅ Preenchimento de paciente concluído.")
-        return True
 
     except Exception as e:
-        print(f"❌ Erro ao preencher o paciente: {e}")
+        print(f"❌ Erro ao preencher o paciente ({type(e).__name__})")
         return False
 
 
@@ -298,7 +327,7 @@ def cadastrar_paciente(driver, wait, nome_paciente, cpf):
         return True
 
     except Exception as e:
-        print(f"❌ Erro ao cadastrar paciente: {e}")
+        print(f"❌ Erro ao cadastrar paciente ({type(e).__name__})")
         return False
 
 
@@ -328,103 +357,159 @@ def abrir_select2_paciente(driver, wait, cpf):
         return True
 
     except Exception as e:
-        print(f"❌ Erro ao abrir select2 do paciente: {e}")
+        print(f"❌ Erro ao abrir select2 do paciente ({type(e).__name__})")
         return False
 
 
-def confirmar_agendamento(driver, wait):
+def salvar_agendamento(driver, wait):
     try:
         # Aguarda o botão "Salvar" ficar clicável, rola até ele e realiza o clique
         botao_salvar = wait.until(EC.element_to_be_clickable((By.ID, "btnSalvarAgenda")))
         driver.execute_script("arguments[0].scrollIntoView(true);", botao_salvar)
         botao_salvar.click()
         print("✅ Clique no botão 'Salvar' realizado.")
-
-        # Verifica se aparece um pop-up de erro logo após clicar (aguarda até 5 segundos)
-        try:
-            erro_popup = wait.until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, "div.ui-pnotify.alert-danger"))
-            )
-            titulo_erro = erro_popup.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
-            mensagem_erro = erro_popup.find_element(By.CSS_SELECTOR, "div.ui-pnotify-text").text
-            print("⛔ Erro ao salvar agendamento:")
-            print("   Título:", titulo_erro)
-            print("   Mensagem:", mensagem_erro)
-            return False
-        except TimeoutException:
-            # Caso não apareça erro, prossegue com o fluxo
-            pass
-
-        # Aguarda a aparição do pop-up de sucesso
-        try:
-            pop_up_sucesso = wait.until(
-                EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, "div.alert.ui-pnotify-container.alert-success")
-                )
-            )
-            titulo_sucesso = pop_up_sucesso.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
-            print("✅ Pop-up de sucesso detectado:", titulo_sucesso)
-        except TimeoutException:
-            print("⚠️ Pop-up de sucesso não apareceu.")
-
-        # # Verifica na listagem se o agendamento foi realizado (ajuste o XPath conforme necessário)
-        # try:
-        #     novo_agendamento = wait.until(
-        #         EC.visibility_of_element_located((
-        #             By.XPATH,
-        #             "//table[@id='listaAgendamentos']//tr[td[contains(text(),'Consulta')]]"
-        #         ))
-        #     )
-        #     print("✅ Agendamento encontrado na lista:", novo_agendamento.text)
-        # except TimeoutException:
-        #     print("⛔ Agendamento não foi listado na página.")
-        #     return False
-
         return True
 
     except TimeoutException:
         print("⛔ Botão 'Salvar' não apareceu a tempo.")
         return False
     except Exception as e:
-        print(f"❌ Erro ao tentar clicar no botão 'Salvar': {e}")
+        print(f"❌ Erro ao tentar clicar no botão 'Salvar' ({type(e).__name__})")
         return False
 
-# def confirmar_agendamento(driver, wait):
-#     try:
-#         # Aguarda o botão ficar disponível e clicável
-#         botao_salvar = wait.until(EC.element_to_be_clickable((By.ID, "btnSalvarAgenda")))
-#         driver.execute_script("arguments[0].scrollIntoView(true);", botao_salvar)
-#         botao_salvar.click()
-#         print("✅ Clique no botão 'Salvar' realizado.")
-#
-#         try:
-#             # Aguarda até que o pop-up de erro esteja visível (tempo máximo de 10 segundos)
-#             erro_popup = wait.until(
-#                 EC.visibility_of_element_located((By.CSS_SELECTOR, "div.ui-pnotify.alert-danger"))
-#             )
-#
-#             # Extrai o título do erro e a mensagem
-#             titulo_erro = erro_popup.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
-#             mensagem_erro = erro_popup.find_element(By.CSS_SELECTOR, "div.ui-pnotify-text").text
-#
-#             print("Título do Erro:", titulo_erro)
-#             print("Mensagem do Erro:", mensagem_erro)
-#         except Exception as e:
-#             print("Pop-up de erro não encontrado:", e)
-#
-#         # Aguarda feedback da página
-#         wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "modal-content")))
-#         print("✅ Modal de agendamento fechado. Agendamento provavelmente concluído.")
-#         return True
-#
-#     except TimeoutException:
-#         print("⛔ Botão 'Salvar' não apareceu a tempo.")
-#         return False
-#     except Exception as e:
-#         print(f"❌ Erro ao tentar clicar no botão 'Salvar': {e}")
-#         return False
+        # # Verifica se aparece um pop-up de erro logo após clicar (aguarda até 5 segundos)
+        # try:
+        #     erro_popup = wait.until(
+        #         EC.visibility_of_element_located((By.CSS_SELECTOR, "div.ui-pnotify.alert-danger"))
+        #     )
+        #     titulo_erro = erro_popup.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
+        #     mensagem_erro = erro_popup.find_element(By.CSS_SELECTOR, "div.ui-pnotify-text").text
+        #     print("⛔ Erro ao salvar agendamento:")
+        #     print("   Título:", titulo_erro)
+        #     print("   Mensagem:", mensagem_erro)
+        #     return False
+        # except TimeoutException:
+        #     # Caso não apareça erro, prossegue com o fluxo
+        #     pass
+        #
+        # # Aguarda a aparição do pop-up de sucesso
+        # try:
+        #     pop_up_sucesso = wait.until(
+        #         EC.visibility_of_element_located(
+        #             (By.CSS_SELECTOR, "div.alert.ui-pnotify-container.alert-success")
+        #         )
+        #     )
+        #     titulo_sucesso = pop_up_sucesso.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
+        #     print("✅ Pop-up de sucesso detectado:", titulo_sucesso)
+        # except TimeoutException:
+        #     print("⚠️ Pop-up de sucesso não apareceu.")
+def confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
+        # Verifica na listagem se o agendamento foi realizado
+        agendamento_realizado = True
+        try:
+            checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
+            driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
+
+            # Verifica se o checkbox está marcado
+            if checkbox.is_selected():
+                driver.execute_script("arguments[0].click();", checkbox)
+                time.sleep(1)
+                print("☑️ Checkbox 'Somente horários vazios' desmarcada.")
+            else:
+                print("☑️ Checkbox 'Somente horários vazios' já estava desmarcada.")
+
+        except TimeoutException:
+            print("⚠️ Checkbox não encontrada.")
+            return False
+
+        blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
+        bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade, hora, agendamento_realizado)
+
+        if not bloco_desejado:
+            print("⛔ Horário desejado com o profissional especificado não encontrado.")
+            return False
+        hora_id = hora.replace(":", "")
+        try:
+            tr_horario = bloco_desejado.find_element(By.CSS_SELECTOR, f"tr[data-id='{hora_id}']")
+            botao = tr_horario.find_element(By.CSS_SELECTOR, "button.btn.btn-xs.btn-warning.slot-cor")
+            driver.execute_script("arguments[0].scrollIntoView(true);", botao) # TODO Não precisa necessariamente
+
+            # Verifica se o botão está clicável (habilitado e visível) # TODO Não precisa necessariamente
+            if botao.is_enabled() and botao.is_displayed():
+                print(f"\n✅ Horário encontrado: {hora} com {nome_medico}")
+            else:
+                logger.warning("❌ Botão do horário não está clicável.")
+                return False
+
+        except Exception as e:
+            logger.warning(f"❌ Erro ao localizar o botão do horário ({type(e).__name__})")
+            return False
+
+        try:
+            # Verifica se o nome do paciente consta nessa linha
+            if nome_paciente in tr_horario.text:
+                print(f"✅ Agendamento confirmado: {tr_horario.text}")
+                return True
+            else:
+                print("⛔ Agendamento não encontrado: nome do paciente não confere.")
+                return False
+
+        except Exception as e:
+            print("⛔ Erro ao verificar o agendamento:", type(e).__name__)
+            return False
 
 
+def cancelar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
+    # Verifica na listagem se o agendamento foi realizado
+    agendamento_realizado = True
+    try:
+        checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
+        driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
 
+        # Verifica se o checkbox está marcado
+        if checkbox.is_selected():
+            driver.execute_script("arguments[0].click();", checkbox)
+            time.sleep(1)
+            print("☑️ Checkbox 'Somente horários vazios' desmarcada.")
+        else:
+            print("☑️ Checkbox 'Somente horários vazios' já estava desmarcada.")
 
+    except TimeoutException:
+        print("⚠️ Checkbox não encontrada.")
+        return False
 
+    blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
+    bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade, hora, agendamento_realizado)
+
+    if not bloco_desejado:
+        print("⛔ Horário agendado com o profissional especificado não encontrado.")
+        return False
+    hora_id = hora.replace(":", "")
+    try:
+        tr_horario = bloco_desejado.find_element(By.CSS_SELECTOR, f"tr[data-id='{hora_id}']")
+        botao = tr_horario.find_element(By.CSS_SELECTOR, "button.btn.btn-xs.btn-warning.slot-cor")
+        driver.execute_script("arguments[0].scrollIntoView(true);", botao)  # TODO Não precisa necessariamente
+
+        # Verifica se o botão está clicável (habilitado e visível) # TODO Não precisa necessariamente
+        if botao.is_enabled() and botao.is_displayed():
+            print(f"\n✅ Horário encontrado: {hora} com {nome_medico}")
+        else:
+            logger.warning("❌ Botão do horário não está clicável.")
+            return False
+
+    except Exception as e:
+        logger.warning(f"❌ Erro ao localizar o botão do horário ({type(e).__name__})")
+        return False
+
+    try:
+        # Verifica se o nome do paciente consta nessa linha
+        if nome_paciente in tr_horario.text:
+            print(f"✅ Agendamento confirmado: {tr_horario.text}")
+            return True
+        else:
+            print("⛔ Agendamento não encontrado: nome do paciente não confere.")
+            return False
+
+    except Exception as e:
+        print("⛔ Erro ao verificar o agendamento:", type(e).__name__)
+        return False
