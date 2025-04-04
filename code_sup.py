@@ -46,8 +46,13 @@ class CancelarAgendamento(BaseModel):
     nome_paciente: str
     nome_profissional: str
 
-# class RequisicaoHorario(BaseModel):
-#     solicitante_id: str  # novo campo obrigatório
-#     especialidade: str
-#     data: Optional[str] = None
-#     minutos_ate_disponivel: Optional[int] = 0
+
+def print_caixa(titulo: str, conteudo: dict):
+    lenght = len(titulo)
+    bars = 40 - lenght
+    bars_side = int((bars/2)-1)
+
+    print(f"\n{'='*bars_side} {titulo.upper()} {'='*bars_side}")
+    for chave, valor in conteudo.items():
+        print(f"|{chave}: {valor}")
+    print(f"{'=' * 40}\n")

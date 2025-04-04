@@ -1,4 +1,6 @@
 # 🗂 Bibliotecas
+import time
+
 from fastapi import APIRouter
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -28,6 +30,9 @@ from date_times import navegar_para_data, extrair_horarios_de_bloco
 # 📅 Agendamento
 # from booking import extrair_consultorio_do_bloco
 
+# 📑 Modelos e lifespan
+from code_sup import print_caixa
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -47,7 +52,13 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
             buscar_data = datetime.today().strftime('%d/%m/%Y')  # ou outro formato que você usa
 
         print("\n🧭 Acessando AmorSaúde...")
-        print(f"\nBuscando horário disponivel para:\nEspecialidade: {especialidade}\nData: {buscar_data}\n")
+        print_buscar = {
+            "Especialidade": especialidade,
+            "Data solicitada": buscar_data
+        }
+
+        buscando = print_caixa("Buscando horário", print_buscar)
+        print(buscando)
 
         # ⚙️ Limpa ambiente entre chamadas
         agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
@@ -60,16 +71,18 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
 
             if not sessao_ja_logada(driver):
                 print("🔐 Sessão não ativa. Realizando login...")
+                first_login = True
                 fazer_login(driver, wait)
             else:
                 print("🔓 Sessão já autenticada.")
+                first_login = False
 
             for dias_adiante in range(0, 10):  # tenta pelos próximos 10 dias
                 data_atual = data_base + timedelta(days=dias_adiante)
                 data_str = data_atual.strftime("%d/%m/%Y")
                 print(f"📆 Tentando data {data_str}...")
 
-                if not navegar_para_data(driver, wait, data_atual):
+                if not navegar_para_data(driver, wait, data_atual, first_login):
                     print(f"❌ Não foi possível acessar a data {data_str}")
                     continue
 
@@ -92,24 +105,27 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                 todos_horarios = []
 
                 for bloco in blocos:
-                    try:
-                        medico_raw = bloco.find_element(By.CSS_SELECTOR, "div")
-                        medico = medico_raw.text.strip().split("\n")[0]
-                        horarios = extrair_horarios_de_bloco(bloco, especialidade)
+                    max_tentativas = 2
+                    sucesso = False  # indicador se o bloco foi processado com sucesso
+                    for tentativa in range(max_tentativas):
+                        try:
+                            medico_raw = bloco.find_element(By.CSS_SELECTOR, "div")
+                            medico = medico_raw.text.strip().split("\n")[0]
+                            horarios = extrair_horarios_de_bloco(bloco, especialidade)
 
-                        # try:
-                        #     consultorio = extrair_consultorio_do_bloco(bloco)
-                        # except Exception as e:
-                        #     logger.warning(f"ℹ️ Consultório não encontrado: {e}. Usando valor None.")
-                        #     consultorio = None  # ou "Desconhecido", "", etc.
+                            for h in horarios:
+                                todos_horarios.append((h, medico))
+                            sucesso = True  # deu certo neste bloco
+                            break  # sai do loop de tentativas para este bloco
 
-                        for h in horarios:
-                            todos_horarios.append((h, medico))
-                            # , consultorio
-                    except (NoSuchElementException, StaleElementReferenceException) as e:
-                        logger.warning(f"⚠️ Erro ao acessar bloco ({type(e).__name__}) Pulando esse bloco.")
+                        except (NoSuchElementException, StaleElementReferenceException) as e:
+                                # logger.warning(
+                                #     f"⚠️ Erro ao acessar bloco na tentativa {tentativa + 1} ({type(e).__name__}).")
+                                time.sleep(0.5)  # Pequena pausa antes da próxima tentativa
 
-                    continue
+                    if not sucesso:
+                        # Esse else é executado se nenhuma tentativa for bem-sucedida
+                        logger.warning("⚠️ Erro persistente ao acessar bloco. Pulando esse bloco.")
 
                 if not todos_horarios:
                     print(f"⚠️ Nenhum horário na data {data_str}, tentando próxima...")
@@ -119,15 +135,31 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                     try:
                         hora_dt = datetime.strptime(hora_str, "%H:%M")
                         dt_local = datetime.combine(data_atual.date(), hora_dt.time())
-                        return dt_local.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                        dt_conv = dt_local.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                        return dt_conv
                     except ValueError:
                         return None
 
-                horarios_validos = [
-                    # (h, m, c) for (h, m, c) in todos_horarios
-                    (h, m) for (h, m) in todos_horarios
-                    if (dt := converter_para_datetime(h)) and dt >= limite
-                ]
+                # horarios_validos = [
+                #     # (h, m, c) for (h, m, c) in todos_horarios
+                #     (h, m) for (h, m) in todos_horarios
+                #     if (dt := converter_para_datetime(h)) and dt >= limite
+                # ]
+                # Filtra os horários válidos
+                horarios_validos = []
+                for (h, m) in todos_horarios:
+                    dt = converter_para_datetime(h)
+                    if dt is None:
+                        continue
+
+                # Se a data do agendamento for hoje, aplica o limite
+                if data_atual.date() == agora.date():
+                    if dt >= limite:
+                        horarios_validos.append((h, m))
+                        print(f"horarios validos: {horarios_validos}")
+                else:
+                    # Para datas futuras, não aplica o limite
+                    horarios_validos.append((h, m))
 
                 if not horarios_validos:
                     continue
@@ -145,7 +177,6 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                     continue
 
                 proximo_horario, medico = proximos_horarios[0]
-                # , consultorio
                 registrar_agendamento(
                     usuario_id=solicitante_id,
                     especialidade=especialidade,
@@ -159,7 +190,6 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                     "data": data_str,
                     "proximo_horario": proximo_horario,
                     "medico": medico
-                    # "consultorio": consultorio
                 }
 
             return {
@@ -205,18 +235,20 @@ async def find_slot(body: RequisicaoHorario):
             "mensagem": resultado["erro"]
         }
 
-    print(
-        f"\n✅ Horário disponível encontrado para {body.especialidade}:\n"
-        f"👨‍⚕️ Profissional: {resultado.get('medico')}\n"
-        f"📅 Data: {resultado.get('data')}\n"
-        f"⏰ Horário: {resultado.get('proximo_horario')}\n"
-    )
+    print_horario = {
+        "Especialidade": body.especialidade,
+        "Médico": resultado.get('medico'),
+        "Data encontrada": resultado.get('data'),
+        "Horário": resultado.get('proximo_horario')
+    }
+
+    encontrado = print_caixa("Buscando horário", print_horario)
+    print(encontrado)
 
     return {
         "status": "ok",
         "especialidade": body.especialidade,
         "medico": resultado.get("medico"),
-        # "consultorio": resultado.get("consultorio"), TODO verificar se inclui isso
         "data": resultado.get("data"),
         "proximo_horario": resultado["proximo_horario"]
     }

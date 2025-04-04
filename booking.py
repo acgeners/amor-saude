@@ -4,14 +4,14 @@ import re
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.support.ui import Select
 from typing import Optional
 import logging
 import time
 
-# 📆 Horários e datas
-from date_times import extrair_horarios_de_bloco
+# # 📆 Horários e datas
+# from date_times import extrair_horarios_de_bloco
 
 logger = logging.getLogger(__name__)
 
@@ -29,44 +29,46 @@ def extrair_consultorio_do_bloco(bloco) -> Optional[str]:
         return None
 
 
-def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: str, hora: str, agendamento_realizado):
+def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: str):
     """
     Busca o bloco do profissional específico, com a especialidade e horário desejado.
     Retorna o bloco correspondente ou None.
     """
+    time.sleep(1.5)
     for bloco in blocos:
-        time.sleep(1)
-        try:
-            painel = bloco.find_elements(By.CSS_SELECTOR, ".panel-title")
-            if not painel:
+        resultados = []
+        max_tentativas = 3
+        for tentativa in range(max_tentativas):
+            try:
+                painel = bloco.find_elements(By.CSS_SELECTOR, ".panel-title")
+                if painel:
+                    linhas = painel[0].text.strip().split("\n")
+                    nome_bloco = linhas[0].strip()
+                    especialidade_bloco = linhas[1].strip() if len(linhas) > 1 else ""
+                    # print(f"🔍 Tentativa {tentativa + 1}: Encontrado -> {nome_bloco} | {especialidade_bloco}")
+                    resultados.append((nome_bloco, especialidade_bloco))
+                else:
+                    # print(f"🔍 Tentativa {tentativa + 1}: Painel não encontrado.")
+                    resultados.append((None, None))
+
+            except Exception as e:
+                print(f"⚠️ Erro na tentativa {tentativa + 1} ({type(e).__name__}): {e}")
+                resultados.append((None, None))
+
+            time.sleep(0.5)  # Pequena pausa entre as tentativas
+
+        # Após 3 tentativas, verifica os resultados coletados
+        for nome_bloco, especialidade_bloco in resultados:
+            print(f"🔍 Profissional encontrado -> {nome_bloco} | {especialidade_bloco}")
+            if nome_bloco is None:
                 continue
-
-            linhas = painel[0].text.strip().split("\n")
-            nome_bloco = linhas[0].strip()
-            especialidade_bloco = linhas[1].strip() if len(linhas) > 1 else ""
-
-            print(f"🔍 Profissional encontrado: {nome_bloco} | {especialidade_bloco}")
-
-            # Verifica se é o profissional e especialidade corretos
-            if nome_bloco.lower() != nome_profissional.lower():
-                continue
-            if especialidade.lower() not in especialidade_bloco.lower():
-                continue
-
-            if agendamento_realizado:
+            if nome_bloco.lower() == nome_profissional.lower() and especialidade.lower() in especialidade_bloco.lower():
+                print("✅ Bloco encontrado com os critérios desejados.")
                 return bloco
 
-            # Verifica se o horário desejado está disponível
-            horarios_disponiveis = extrair_horarios_de_bloco(bloco, especialidade)
-            if hora in horarios_disponiveis:
-                return bloco
-
-        except Exception as e:
-            print(f"⚠️ Erro ao analisar bloco ({type(e).__name__})")
-            continue
+        print("⛔ Nenhum profissional com os critérios foi encontrado nesse bloco.")
 
     return None
-
 
 def preencher_paciente(driver, wait, cpf, matricula, data_nascimento, celular):
     try:
@@ -150,6 +152,7 @@ def preencher_paciente(driver, wait, cpf, matricula, data_nascimento, celular):
         # 📱 Celular
         if celular:
             try:
+                time.sleep(1)
                 input_celular = wait.until(EC.visibility_of_element_located((By.ID, "ageCel1")))
                 if not input_celular.get_attribute("value").strip():
                     input_celular.clear()
@@ -165,9 +168,9 @@ def preencher_paciente(driver, wait, cpf, matricula, data_nascimento, celular):
             valor_atual = select_subcanal.first_selected_option.text.strip()
             print(f"Valor atual do Subcanal: '{valor_atual}'")
 
-            # Imprime todas as opções disponíveis
-            for option in select_subcanal.options:
-                print(f"Opção encontrada: '{option.text.strip()}'")
+            # # Imprime todas as opções disponíveis
+            # for option in select_subcanal.options:
+            #     print(f"Opção encontrada: '{option.text.strip()}'")
 
             # Se a opção atual indicar que nenhuma opção foi selecionada, seleciona a opção que contenha "whatsapp"
             if "selecione" in valor_atual.lower():
@@ -379,7 +382,6 @@ def salvar_agendamento(driver, wait):
 
 def confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
         # Verifica na listagem se o agendamento foi realizado
-        agendamento_realizado = True
         try:
             checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
             driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
@@ -397,7 +399,7 @@ def confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especiali
             return False
 
         blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
-        bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade, hora, agendamento_realizado)
+        bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade)
 
         if not bloco_desejado:
             print("⛔ Horário desejado com o profissional especificado não encontrado.")
@@ -435,7 +437,6 @@ def confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especiali
 
 def cancelar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
     # Verifica na listagem se o agendamento foi realizado
-    agendamento_realizado = True
     try:
         checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
         driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
@@ -453,7 +454,7 @@ def cancelar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialid
         return False
 
     blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
-    bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade, hora, agendamento_realizado)
+    bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade)
 
     if not bloco_desejado:
         print("⛔ Horário agendado com o profissional especificado não encontrado.")

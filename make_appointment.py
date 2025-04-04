@@ -25,6 +25,9 @@ from booking import (buscar_bloco_do_profissional, preencher_paciente, salvar_ag
                      cadastrar_paciente, confirmar_agendado)
 # extrair_consultorio_do_bloco,
 
+# 📑 Modelos e lifespan
+from code_sup import print_caixa
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,11 +39,19 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
     async with driver_lock:
         driver = get_driver()
         wait = WebDriverWait(driver, 20)
-        agendamento_realizado = False
+
+        agendando = {
+            "Paciente": nome_paciente,
+            "Especialidade": especialidade,
+            "Médico": nome_medico,
+            "Data": data,
+            "Horário": hora
+        }
+
+        agendar = print_caixa("Buscando horário", agendando)
+        print(agendar)
 
         print("\n🧭 Acessando AmorSaúde...")
-        print(f"\nRealizando agendamento de consulta para {nome_paciente}:\nEspecialidade: {especialidade}\n"
-              f"Nome do Profissional: {nome_medico}\nData: {data}\nHorário: {hora}\n")
 
         # Valida e converte data para datetime
         try:
@@ -54,11 +65,13 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
 
             if not sessao_ja_logada(driver):
                 print("🔐 Sessão não ativa. Realizando login...")
+                first_login = True
                 fazer_login(driver, wait)
             else:
                 print("🔓 Sessão já autenticada.")
+                first_login = True
 
-            if not navegar_para_data(driver, wait, data_dt):
+            if not navegar_para_data(driver, wait, data_dt, first_login):
                 print("⛔ Falha ao navegar para a data desejada.")
                 return None
 
@@ -77,7 +90,7 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
                                     """)
 
             blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
-            bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade, hora, agendamento_realizado)
+            bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade)
 
 
             if not bloco_desejado:
@@ -123,8 +136,8 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
                 if not salvar_agendamento(driver, wait):
                     return {"erro": "Não foi possível confirmar o agendamento."}
 
-                if not confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
-                    return {"erro": "Horário agendado não foi encontrado."}
+                # if not confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
+                #     return {"erro": "Horário agendado não foi encontrado."}
 
                 return {
                     "especialidade": especialidade,
@@ -161,12 +174,15 @@ async def make_appointment(body: ConfirmacaoAgendamento):
     if "erro" in dados:
         return dados
 
-    print(
-        f"\n✅ Agendamento realizado com sucesso para {body.nome_paciente}:\n"
-        f"📌 Especialidade: {dados.get('especialidade')}\n"
-        f"👨‍⚕️ Profissional: {dados.get('nome_medico')}\n"
-        f"📅 Data: {dados.get('data')}\n"
-        f"⏰ Horário: {dados.get('hora')}"
-    )
+    agendado = {
+        "Paciente": body.nome_paciente,
+        "Especialidade": dados.get('especialidade'),
+        "Médico": dados.get('nome_medico'),
+        "Data": dados.get('data'),
+        "Horário": dados.get('hora')
+    }
+
+    agendado_print = print_caixa("Buscando horário", agendado)
+    print(agendado_print)
 
     return {"status": "confirmado", "detalhes": dados}
