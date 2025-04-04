@@ -90,7 +90,7 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
                                     """)
 
             blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
-            bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade)
+            bloco_desejado = buscar_bloco_do_profissional(driver, blocos, nome_medico, especialidade)
 
 
             if not bloco_desejado:

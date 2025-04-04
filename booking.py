@@ -29,13 +29,13 @@ def extrair_consultorio_do_bloco(bloco) -> Optional[str]:
         return None
 
 
-def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: str):
+def buscar_bloco_do_profissional(driver, blocos, nome_profissional: str, especialidade: str):
     """
     Busca o bloco do profissional específico, com a especialidade e horário desejado.
     Retorna o bloco correspondente ou None.
     """
     time.sleep(3)
-    for bloco in blocos:
+    for index, bloco in enumerate(blocos):
         time.sleep(1)
         resultados = []
         max_tentativas = 3
@@ -54,8 +54,15 @@ def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: 
 
             except Exception as e:
                 print(f"⚠️ Erro na tentativa {tentativa + 1} ({type(e).__name__})")
+                # Se der stale, re-localize o bloco a partir do driver
+                try:
+                    # Exemplo: se você souber um locator para os blocos
+                    blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
+                    bloco = blocos[index]
+                    print("Re-localizado o bloco.")
+                except Exception as e2:
+                    print(f"Erro ao re-localizar o bloco {type(e2).__name__}")
                 resultados.append((None, None))
-
             time.sleep(0.5)  # Pequena pausa entre as tentativas
 
         # Após 3 tentativas, verifica os resultados coletados
@@ -401,7 +408,7 @@ def confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especiali
             return False
 
         blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
-        bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade)
+        bloco_desejado = buscar_bloco_do_profissional(driver, blocos, nome_medico, especialidade)
 
         if not bloco_desejado:
             print("⛔ Horário desejado com o profissional especificado não encontrado.")
@@ -456,7 +463,7 @@ def cancelar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialid
         return False
 
     blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
-    bloco_desejado = buscar_bloco_do_profissional(blocos, nome_medico, especialidade)
+    bloco_desejado = buscar_bloco_do_profissional(driver, blocos, nome_medico, especialidade)
 
     if not bloco_desejado:
         print("⛔ Horário agendado com o profissional especificado não encontrado.")
