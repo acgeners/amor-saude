@@ -53,6 +53,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
 
         print("\n🧭 Acessando AmorSaúde...")
         print_buscar = {
+            "Paciente ID": solicitante_id,
             "Especialidade": especialidade,
             "Data solicitada": buscar_data
         }
@@ -100,7 +101,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                                     el.scrollLeft = el.scrollWidth;
                                 }
                             """)
-
+                time.sleep(1)
                 blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
                 todos_horarios = []
 
@@ -109,24 +110,40 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                     sucesso = False  # indicador se o bloco foi processado com sucesso
                     for tentativa in range(max_tentativas):
                         try:
+                            # Reobtém o bloco específico dentro da lista atual de blocos
+                            blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
+                            # Verifica se o índice do bloco atual ainda é válido
+                            index = blocos.index(bloco) if bloco in blocos else None
+                            if index is None:
+                                print(f"❌ Bloco '{bloco.text}' não está mais disponível. Ignorando.")
+                                break  # Sai do loop interno para começar outro bloco
+
+                            bloco = blocos[index]  # Reassocia ao bloco válido
+
+                            # Processa o bloco normalmente
                             medico_raw = bloco.find_element(By.CSS_SELECTOR, "div")
                             medico = medico_raw.text.strip().split("\n")[0]
                             horarios = extrair_horarios_de_bloco(bloco, especialidade)
 
-                            for h in horarios:
-                                todos_horarios.append((h, medico))
+                            if horarios:  # Apenas adiciona se houver horários encontrados
+                                for h in horarios:
+                                    todos_horarios.append((h, medico))
+
+                            # print(f"Todos os horários: {todos_horarios}")
                             sucesso = True  # deu certo neste bloco
                             break  # sai do loop de tentativas para este bloco
 
-                        except (NoSuchElementException, StaleElementReferenceException) as e:
+                        except (NoSuchElementException, StaleElementReferenceException):
+                                # TODO tirei o 'as e:', ver se deu erro
                                 # logger.warning(
                                 #     f"⚠️ Erro ao acessar bloco na tentativa {tentativa + 1} ({type(e).__name__}).")
                                 time.sleep(0.5)  # Pequena pausa antes da próxima tentativa
 
                     if not sucesso:
                         # Esse else é executado se nenhuma tentativa for bem-sucedida
-                        # TODO PODE SÓ TIRAR ESSE LOG?
-                        logger.warning("⚠️ Erro persistente ao acessar bloco. Pulando esse bloco.")
+                        # TODO VERIFICAR SE DEU CERTO A MUDANÇA
+                        # logger.warning("⚠️ Erro persistente ao acessar bloco. Pulando esse bloco.")
+                        pass
 
                 if not todos_horarios:
                     print(f"⚠️ Nenhum horário na data {data_str}, tentando próxima...")
@@ -138,7 +155,8 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                         dt_local = datetime.combine(data_atual.date(), hora_dt.time())
                         dt_conv = dt_local.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
                         return dt_conv
-                    except ValueError:
+                    except ValueError as e2:
+                        print(f"Erro ao converter '{hora_str}' para datetime: {e2}")
                         return None
 
                 # horarios_validos = [
@@ -149,31 +167,61 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                 # Filtra os horários válidos
                 horarios_validos = []
                 for (h, m) in todos_horarios:
+                    # print(f"Testando horário: {h}, Médico: {m}")
                     dt = converter_para_datetime(h)
                     if dt is None:
                         continue
 
-                # Se a data do agendamento for hoje, aplica o limite
-                if data_atual.date() == agora.date():
-                    if dt >= limite:
+                    # Se a data do agendamento for hoje, aplica o limite
+                    if data_atual.date() == agora.date():
+                        # print("É data atual")
+                        if dt >= limite:
+                            # print("Horário é depois do limite minimo")
+                            horarios_validos.append((h, m))
+                    else:
+                        # Para datas futuras, não aplica o limite
+                        print("Data desejada não é hoje")
                         horarios_validos.append((h, m))
-                else:
-                    # Para datas futuras, não aplica o limite
-                    horarios_validos.append((h, m))
+
+                    print(f"horarios validos 1: {horarios_validos}")
+
 
                 if not horarios_validos:
+                    logger.info(f"⚠️ Nenhum horário válido encontrado em {data_str}. Tentando próxima data...")
                     continue
 
-                print(f"horarios validos: {horarios_validos}")
+                print(f"horarios validos 2: {horarios_validos}")
                 # TODO VER A COMPARAÇÃO DO ID DO SOLICITANTE
+                # proximos_horarios = sorted(
+                #     [
+                #         # (h, m, c) for (h, m, c) in horarios_validos
+                #         (h, m) for (h, m) in horarios_validos
+                #         if not ja_foi_enviado(solicitante_id, especialidade, data_str, h, m)
+                #     ],
+                #     key=lambda x: converter_para_datetime(x[0])
+                # )
                 proximos_horarios = sorted(
                     [
-                        # (h, m, c) for (h, m, c) in horarios_validos
+                        # (h, m) para cada horário válido em horarios_validos
                         (h, m) for (h, m) in horarios_validos
                         if not ja_foi_enviado(solicitante_id, especialidade, data_str, h, m)
                     ],
                     key=lambda x: converter_para_datetime(x[0])
                 )
+
+                # Adicionando logs
+                logger.info("Iniciando filtragem dos horários válidos.")
+                for h, m in horarios_validos:
+                    if not ja_foi_enviado(solicitante_id, especialidade, data_str, h, m):
+                        logger.debug(f"Horário válido encontrado: {h}:{m}")
+                    else:
+                        logger.debug(f"Horário DESCONSIDERADO (já enviado): {h}:{m}")
+
+                logger.info(
+                    f"Horários filtrados: {[(h, m) for (h, m) in horarios_validos if not ja_foi_enviado(solicitante_id, especialidade, data_str, h, m)]}")
+
+                # Após a ordenação
+                logger.info("Horários filtrados e ordenados com sucesso.")
 
                 if not proximos_horarios:
                     continue
@@ -187,7 +235,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                     medico_nome=medico,
                     consultorio=""
                 )
-
+                print("Registrou o agendamento")
                 return {
                     "data": data_str,
                     "proximo_horario": proximo_horario,
@@ -244,7 +292,7 @@ async def find_slot(body: RequisicaoHorario):
         "Horário": resultado.get('proximo_horario')
     }
 
-    encontrado = print_caixa("Buscando horário", print_horario)
+    encontrado = print_caixa("Horário encontrado", print_horario)
     print(encontrado)
 
     return {

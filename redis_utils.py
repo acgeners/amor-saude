@@ -38,8 +38,34 @@ def registrar_agendamento(usuario_id: str, especialidade: str, data: str, hora: 
 
 
 def ja_foi_enviado(usuario_id: str, especialidade: str, data: str, horario: str, medico_nome: str) -> bool:
+    # Normaliza os dados de entrada para garantir consistência
     nome_normalizado = normalizar_nome(medico_nome)
-    chave = f"agendamento:{usuario_id}:{especialidade.lower()}:{data}:{horario}:{nome_normalizado}"
-    return redis_client.exists(chave) == 1
+    especialidade = especialidade.lower()
+
+    # Define o padrão para extrair os elementos da chave
+    padrao = r"^agendamento:(.*?):(.*?):(.*?):(.*?):(.*?)$"
+
+    # Recupera todas as chaves no Redis relacionadas a agendamentos
+    chaves = redis_client.keys("agendamento:*")
+
+    for chave in chaves:
+        # Extrai os componentes da chave usando regex
+        match = re.match(padrao, chave)
+        if match:
+            chave_usuario_id, chave_especialidade, chave_data, chave_horario, chave_nome_normalizado = match.groups()
+
+            # Verifica os critérios individualmente
+            if (
+                    chave_usuario_id == usuario_id and
+                    chave_especialidade == especialidade and
+                    chave_data == data and
+                    chave_horario == horario and
+                    chave_nome_normalizado == nome_normalizado
+            ):
+                # O agendamento já foi enviado
+                return True
+
+    # Se não encontrou nenhum registro correspondente, retorna False
+    return False
 
 
