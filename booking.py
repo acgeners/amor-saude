@@ -157,7 +157,6 @@ def preencher_paciente(driver, wait, cpf, matricula, data_nascimento, celular):
                     print(f"📱 Celular preenchido: {celular}")
             except Exception as e:
                 logger.warning(f"⚠️ Erro ao preencher celular ({type(e).__name__})")
-                return False
 # ___________________________________________________________________________________________________________________
         # 📨 Subcanal
         try:
@@ -377,32 +376,7 @@ def salvar_agendamento(driver, wait):
         print(f"❌ Erro ao tentar clicar no botão 'Salvar' ({type(e).__name__})")
         return False
 
-        # # Verifica se aparece um pop-up de erro logo após clicar (aguarda até 5 segundos)
-        # try:
-        #     erro_popup = wait.until(
-        #         EC.visibility_of_element_located((By.CSS_SELECTOR, "div.ui-pnotify.alert-danger"))
-        #     )
-        #     titulo_erro = erro_popup.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
-        #     mensagem_erro = erro_popup.find_element(By.CSS_SELECTOR, "div.ui-pnotify-text").text
-        #     print("⛔ Erro ao salvar agendamento:")
-        #     print("   Título:", titulo_erro)
-        #     print("   Mensagem:", mensagem_erro)
-        #     return False
-        # except TimeoutException:
-        #     # Caso não apareça erro, prossegue com o fluxo
-        #     pass
-        #
-        # # Aguarda a aparição do pop-up de sucesso
-        # try:
-        #     pop_up_sucesso = wait.until(
-        #         EC.visibility_of_element_located(
-        #             (By.CSS_SELECTOR, "div.alert.ui-pnotify-container.alert-success")
-        #         )
-        #     )
-        #     titulo_sucesso = pop_up_sucesso.find_element(By.CSS_SELECTOR, "h4.ui-pnotify-title").text
-        #     print("✅ Pop-up de sucesso detectado:", titulo_sucesso)
-        # except TimeoutException:
-        #     print("⚠️ Pop-up de sucesso não apareceu.")
+
 def confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
         # Verifica na listagem se o agendamento foi realizado
         agendamento_realizado = True
