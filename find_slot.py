@@ -157,13 +157,14 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                 if data_atual.date() == agora.date():
                     if dt >= limite:
                         horarios_validos.append((h, m))
-                        print(f"horarios validos: {horarios_validos}")
                 else:
                     # Para datas futuras, não aplica o limite
                     horarios_validos.append((h, m))
 
                 if not horarios_validos:
                     continue
+
+                print(f"horarios validos: {horarios_validos}")
                 # TODO VER A COMPARAÇÃO DO ID DO SOLICITANTE
                 proximos_horarios = sorted(
                     [
@@ -176,7 +177,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
 
                 if not proximos_horarios:
                     continue
-
+                print(f"proximos horarios: {proximos_horarios}")
                 proximo_horario, medico = proximos_horarios[0]
                 registrar_agendamento(
                     usuario_id=solicitante_id,

@@ -34,8 +34,9 @@ def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: 
     Busca o bloco do profissional específico, com a especialidade e horário desejado.
     Retorna o bloco correspondente ou None.
     """
-    time.sleep(1.5)
+    time.sleep(3)
     for bloco in blocos:
+        time.sleep(1)
         resultados = []
         max_tentativas = 3
         for tentativa in range(max_tentativas):
