@@ -45,20 +45,21 @@ def buscar_bloco_do_profissional(blocos, nome_profissional: str, especialidade: 
                     linhas = painel[0].text.strip().split("\n")
                     nome_bloco = linhas[0].strip()
                     especialidade_bloco = linhas[1].strip() if len(linhas) > 1 else ""
-                    # print(f"🔍 Tentativa {tentativa + 1}: Encontrado -> {nome_bloco} | {especialidade_bloco}")
+                    print(f"🔍 Tentativa {tentativa + 1}: Encontrado -> {nome_bloco} | {especialidade_bloco}")
                     resultados.append((nome_bloco, especialidade_bloco))
                 else:
                     # print(f"🔍 Tentativa {tentativa + 1}: Painel não encontrado.")
                     resultados.append((None, None))
 
             except Exception as e:
-                print(f"⚠️ Erro na tentativa {tentativa + 1} ({type(e).__name__}): {e}")
+                print(f"⚠️ Erro na tentativa {tentativa + 1} ({type(e).__name__})")
                 resultados.append((None, None))
 
             time.sleep(0.5)  # Pequena pausa entre as tentativas
 
         # Após 3 tentativas, verifica os resultados coletados
         for nome_bloco, especialidade_bloco in resultados:
+            # TODO VER COMO IMPRIME SÓ UMA VEZ
             print(f"🔍 Profissional encontrado -> {nome_bloco} | {especialidade_bloco}")
             if nome_bloco is None:
                 continue

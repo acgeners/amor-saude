@@ -125,6 +125,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
 
                     if not sucesso:
                         # Esse else é executado se nenhuma tentativa for bem-sucedida
+                        # TODO PODE SÓ TIRAR ESSE LOG?
                         logger.warning("⚠️ Erro persistente ao acessar bloco. Pulando esse bloco.")
 
                 if not todos_horarios:
@@ -163,7 +164,7 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
 
                 if not horarios_validos:
                     continue
-
+                # TODO VER A COMPARAÇÃO DO ID DO SOLICITANTE
                 proximos_horarios = sorted(
                     [
                         # (h, m, c) for (h, m, c) in horarios_validos

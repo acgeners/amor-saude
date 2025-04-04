@@ -22,8 +22,8 @@ from auth_utils import sessao_ja_logada, fazer_login
 
 # 📅 Agendamento
 from booking import (buscar_bloco_do_profissional, preencher_paciente, salvar_agendamento,
-                     cadastrar_paciente, confirmar_agendado)
-# extrair_consultorio_do_bloco,
+                     cadastrar_paciente)
+# extrair_consultorio_do_bloco,, confirmar_agendado
 
 # 📑 Modelos e lifespan
 from code_sup import print_caixa
@@ -48,7 +48,7 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
             "Horário": hora
         }
 
-        agendar = print_caixa("Buscando horário", agendando)
+        agendar = print_caixa("Agendando horário", agendando)
         print(agendar)
 
         print("\n🧭 Acessando AmorSaúde...")
@@ -97,8 +97,6 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
                 logger.warning("⛔ Horário desejado com o profissional especificado não encontrado.")
                 return {"erro": "Horário desejado com o profissional especificado não encontrado."}
 
-            # consultorio_desejado = extrair_consultorio_do_bloco(bloco_desejado) TODO ver se vai usar
-
             # Clica no botão correspondente ao horário
             try:
                 tr_horario = bloco_desejado.find_element(By.CSS_SELECTOR, f"tr[data-hora='{hora}']")
@@ -136,13 +134,13 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
                 if not salvar_agendamento(driver, wait):
                     return {"erro": "Não foi possível confirmar o agendamento."}
 
+                # TODO CORRIGIR ESSA PARTE
                 # if not confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
                 #     return {"erro": "Horário agendado não foi encontrado."}
 
                 return {
                     "especialidade": especialidade,
                     "nome_medico": nome_medico,
-                    # "consultorio": consultorio_desejado, TODO pode incluir isso?
                     "data": data,
                     "hora": hora,
                     "paciente": nome_paciente,
@@ -182,7 +180,7 @@ async def make_appointment(body: ConfirmacaoAgendamento):
         "Horário": dados.get('hora')
     }
 
-    agendado_print = print_caixa("Buscando horário", agendado)
+    agendado_print = print_caixa("Horário agendado!", agendado)
     print(agendado_print)
 
     return {"status": "confirmado", "detalhes": dados}
