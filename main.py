@@ -9,7 +9,7 @@ import logging
 # 🧭 Rotas
 from find_slot import router as slot_finder
 from make_appointment import router as appointment_maker
-from amb_test import router as test
+# from amb_test import router as test
 # from cancel_appointment import router as appointment_cancelation
 
 # 📑 Modelos e lifespan
@@ -44,7 +44,7 @@ app = FastAPI(
 # Registrando as rotas
 app.include_router(slot_finder, prefix="/amor-saude")
 app.include_router(appointment_maker, prefix="/amor-saude")
-app.include_router(test, prefix="/amor-saude")
+# app.include_router(test, prefix="/amor-saude")
 # app.include_router(appointment_cancelation, prefix="/amor-saude")
 
 
