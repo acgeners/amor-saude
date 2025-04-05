@@ -83,7 +83,8 @@ async def buscar_primeiro_horario(especialidade: str, solicitante_id: str, data:
                 data_str = data_atual.strftime("%d/%m/%Y")
                 print(f"📆 Tentando data {data_str}...")
 
-                if not navegar_para_data(driver, wait, data_atual, first_login):
+                disp = True
+                if not navegar_para_data(driver, wait, data_atual, first_login, disp):
                     print(f"❌ Não foi possível acessar a data {data_str}")
                     continue
 

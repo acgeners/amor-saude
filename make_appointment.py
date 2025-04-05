@@ -22,8 +22,8 @@ from auth_utils import sessao_ja_logada, fazer_login
 
 # 📅 Agendamento
 from booking import (buscar_bloco_do_profissional, preencher_paciente, salvar_agendamento,
-                     cadastrar_paciente)
-# extrair_consultorio_do_bloco,, confirmar_agendado
+                     cadastrar_paciente, confirmar_agendado)
+# extrair_consultorio_do_bloco,,
 
 # 📑 Modelos e lifespan
 from code_sup import print_caixa
@@ -71,7 +71,8 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
                 print("🔓 Sessão já autenticada.")
                 first_login = True
 
-            if not navegar_para_data(driver, wait, data_dt, first_login):
+            disp = False
+            if not navegar_para_data(driver, wait, data_dt, first_login, disp):
                 print("⛔ Falha ao navegar para a data desejada.")
                 return None
 
@@ -135,8 +136,8 @@ async def agendar_horario(nome_medico: str, especialidade: str, data: str, hora:
                     return {"erro": "Não foi possível confirmar o agendamento."}
 
                 # TODO CORRIGIR ESSA PARTE
-                # if not confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
-                #     return {"erro": "Horário agendado não foi encontrado."}
+                if not confirmar_agendado(driver, wait, nome_paciente, nome_medico, hora, especialidade):
+                    return {"erro": "Horário agendado não foi encontrado."}
 
                 return {
                     "especialidade": especialidade,

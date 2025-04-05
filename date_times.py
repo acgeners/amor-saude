@@ -48,6 +48,10 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
 
 
 def navegar_para_data(driver, wait, target_date: datetime, first, disp) -> bool:
+    print("Tipo de target_date:", type(target_date))
+    print("Valor de target_date.month:", target_date.month)
+    print("Valor de abreviacoes_meses:", abreviacoes_meses)
+
     try:
         wait.until(EC.presence_of_element_located((By.ID, "tblCalendario")))
 
@@ -77,23 +81,27 @@ def navegar_para_data(driver, wait, target_date: datetime, first, disp) -> bool:
                         if first:
                             time.sleep(1.5)
 
-                        try:
-                            checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
-                            driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
-                            driver.execute_script("arguments[0].click();", checkbox)
-                            time.sleep(1)
-                            # Verifica se o checkbox já está selecionado
-                            if checkbox.is_selected():
-                                print("✅ Checkbox 'Somente horários vazios' já está marcado.")
-                            else:
-                                # Se não estiver marcado, clica no checkbox para marcá-lo
+                        if disp:
+                            try:
+                                checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
+                                driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
                                 driver.execute_script("arguments[0].click();", checkbox)
-                                time.sleep(1)  # Pequena espera para garantir que o clique foi processado
-                                print("☑️ Checkbox 'Somente horários vazios' foi marcada.")
+                                time.sleep(1)
+                                # Verifica se o checkbox já está selecionado
+                                if checkbox.is_selected():
+                                    print("✅ Checkbox 'Somente horários vazios' já está marcado.")
+                                else:
+                                    # Se não estiver marcado, clica no checkbox para marcá-lo
+                                    driver.execute_script("arguments[0].click();", checkbox)
+                                    time.sleep(1)  # Pequena espera para garantir que o clique foi processado
+                                    print("☑️ Checkbox 'Somente horários vazios' foi marcada.")
 
-                        except TimeoutException:
-                            print("⚠️ Checkbox não encontrada após clicar na data.")
-                            return False
+                            except TimeoutException:
+                                print("⚠️ Checkbox não encontrada após clicar na data.")
+                                return False
+
+                        else:
+                            print("Não há necessidade de clicar na checkbox.")
 
                         return True
                     except Exception as e_data:

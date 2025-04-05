@@ -51,7 +51,7 @@ def buscar_bloco_do_profissional(driver, blocos, nome_profissional: str, especia
                     linhas = painel[0].text.strip().split("\n")
                     nome_bloco = linhas[0].strip()
                     especialidade_bloco = linhas[1].strip() if len(linhas) > 1 else ""
-                    print(f"🔍 Tentativa {tentativa + 1}: Encontrado -> {nome_bloco} | {especialidade_bloco}")
+                    # print(f"🔍 Tentativa {tentativa + 1}: Encontrado -> {nome_bloco} | {especialidade_bloco}")
                     resultados.append((nome_bloco, especialidade_bloco))
                     # Se ainda não temos um resultado válido, guarda o primeiro que não é None
                     if resultado_valido is None and nome_bloco is not None:
@@ -300,9 +300,14 @@ def preencher_paciente(driver, wait, cpf, matricula, data_nascimento, celular):
                     print("⛔ Nenhuma opção contendo 'consulta' foi encontrada.")
                     return False
 
-                # Rebuscar o elemento para evitar stale reference
+                # Rebuscar o elemento para evitar stale reference TODO ver se não é melhor identar essa linha
                 opcoes = driver.find_elements(By.CSS_SELECTOR, "ul.select2-results__options li")
                 opcao_alvo = opcoes[index_consulta]
+
+                # Rola a opção desejada para a visualização
+                driver.execute_script("arguments[0].scrollIntoView(true);", opcao_alvo)
+                time.sleep(0.5)  # Aguarda a rolagem se necessário
+
                 texto_final = opcao_alvo.text.strip()
                 opcao_alvo.click()
                 print(f"✅ Procedimento selecionado: {texto_final}")
