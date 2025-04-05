@@ -1,15 +1,21 @@
 # 🗂 Bibliotecas
 import json
 import os
+import unicodedata
 import re
 from redis import from_url
 from datetime import datetime
 
-# 📑 Modelos e lifespan
-from code_sup import normalizar_nome
 
 REDIS_URL = os.getenv("REDIS_URL")
 redis_client = from_url(REDIS_URL, decode_responses=True)
+
+
+def normalizar_nome(nome: str) -> str:
+    nome = nome.lower().strip()
+    nome = unicodedata.normalize('NFKD', nome).encode('ascii', 'ignore').decode('utf-8')
+    nome = re.sub(r'\s+', '_', nome)  # substitui espaços por _
+    return nome
 
 
 def registrar_agendamento(usuario_id: str, especialidade: str, data: str, hora: str, medico_nome: str, consultorio: str, ttl: int = 86400):

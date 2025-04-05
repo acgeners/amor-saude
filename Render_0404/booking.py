@@ -10,9 +10,6 @@ from typing import Optional
 import logging
 import time
 
-# 📑 Modelos e lifespan
-from code_sup import similar
-
 # # 📆 Horários e datas
 # from date_times import extrair_horarios_de_bloco
 
@@ -42,8 +39,6 @@ def buscar_bloco_do_profissional(driver, blocos, nome_profissional: str, especia
         time.sleep(1)
         resultados = []
         max_tentativas = 3
-        resultado_valido = None  # variável para guardar o primeiro resultado não nulo
-
         for tentativa in range(max_tentativas):
             try:
                 painel = bloco.find_elements(By.CSS_SELECTOR, ".panel-title")
@@ -53,9 +48,6 @@ def buscar_bloco_do_profissional(driver, blocos, nome_profissional: str, especia
                     especialidade_bloco = linhas[1].strip() if len(linhas) > 1 else ""
                     print(f"🔍 Tentativa {tentativa + 1}: Encontrado -> {nome_bloco} | {especialidade_bloco}")
                     resultados.append((nome_bloco, especialidade_bloco))
-                    # Se ainda não temos um resultado válido, guarda o primeiro que não é None
-                    if resultado_valido is None and nome_bloco is not None:
-                        resultado_valido = (nome_bloco, especialidade_bloco)
                 else:
                     # print(f"🔍 Tentativa {tentativa + 1}: Painel não encontrado.")
                     resultados.append((None, None))
@@ -64,6 +56,7 @@ def buscar_bloco_do_profissional(driver, blocos, nome_profissional: str, especia
                 print(f"⚠️ Erro na tentativa {tentativa + 1} ({type(e).__name__})")
                 # Se der stale, re-localize o bloco a partir do driver
                 try:
+                    # Exemplo: se você souber um locator para os blocos
                     blocos = driver.find_elements(By.CSS_SELECTOR, "td[id^='pf']")
                     bloco = blocos[index]
                     print("Re-localizado o bloco.")
@@ -73,25 +66,16 @@ def buscar_bloco_do_profissional(driver, blocos, nome_profissional: str, especia
             time.sleep(0.5)  # Pequena pausa entre as tentativas
 
         # Após 3 tentativas, verifica os resultados coletados
-        # Imprime apenas uma vez com base no primeiro resultado válido (se houver)
-        if resultado_valido:
-            nome_bloco, especialidade_bloco = resultado_valido
+        for nome_bloco, especialidade_bloco in resultados:
+            # TODO VER COMO IMPRIME SÓ UMA VEZ
             print(f"🔍 Profissional encontrado -> {nome_bloco} | {especialidade_bloco}")
-
-        # for nome_bloco, especialidade_bloco in resultados:
-        #     # TODO VER COMO IMPRIME SÓ UMA VEZ
-        #     print(f"🔍 Profissional encontrado -> {nome_bloco} | {especialidade_bloco}")
-        #     if nome_bloco is None:
-        #         continue
-            # if nome_bloco.lower() == nome_profissional.lower() and especialidade.lower() in especialidade_bloco.lower():
-            if similar(nome_bloco.lower(),
-                       nome_profissional.lower()) >= 0.75 and especialidade.lower() in especialidade_bloco.lower():
-                print(f"✅ Bloco encontrado com os critérios desejados.\nProfissional selecionado: {nome_profissional}\n"
-                      f"Profissional bloco: {nome_bloco}\nSimilaridade: {similar(nome_bloco.lower(),nome_profissional.lower())}")
+            if nome_bloco is None:
+                continue
+            if nome_bloco.lower() == nome_profissional.lower() and especialidade.lower() in especialidade_bloco.lower():
+                print("✅ Bloco encontrado com os critérios desejados.")
                 return bloco
 
-        else:
-            print("⛔ Nenhum profissional com os critérios foi encontrado nesse bloco.")
+        print("⛔ Nenhum profissional com os critérios foi encontrado nesse bloco.")
 
     return None
 

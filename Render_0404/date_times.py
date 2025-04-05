@@ -47,7 +47,7 @@ def extrair_horarios_de_bloco(bloco, especialidade: str) -> list[str]:
     return horarios
 
 
-def navegar_para_data(driver, wait, target_date: datetime, first, disp) -> bool:
+def navegar_para_data(driver, wait, target_date: datetime, first) -> bool:
     try:
         wait.until(EC.presence_of_element_located((By.ID, "tblCalendario")))
 
@@ -76,7 +76,6 @@ def navegar_para_data(driver, wait, target_date: datetime, first, disp) -> bool:
                         # ✅ Depois do clique na data: marca/desmarca checkbox
                         if first:
                             time.sleep(1.5)
-
                         try:
                             checkbox = wait.until(EC.presence_of_element_located((By.ID, "HVazios")))
                             driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)

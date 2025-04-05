@@ -2,10 +2,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import os
-import unicodedata
-import re
 from pydantic import BaseModel
-from difflib import SequenceMatcher
 
 # 🧭 Navegador
 from driver_utils import fechar_driver
@@ -59,14 +56,3 @@ def print_caixa(titulo: str, conteudo: dict):
     for chave, valor in conteudo.items():
         print(f"|{chave}: {valor}")
     print(f"{'=' * 40}\n")
-
-
-def normalizar_nome(nome: str) -> str:
-    nome = nome.lower().strip()
-    nome = unicodedata.normalize('NFKD', nome).encode('ascii', 'ignore').decode('utf-8')
-    nome = re.sub(r'\s+', '_', nome)  # substitui espaços por _
-    return nome
-
-
-def similar(a, b):
-    return SequenceMatcher(None, a, b).ratio()
